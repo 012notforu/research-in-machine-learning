@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>QED-Like Simulation (Mobile Optimized)</title>
+  <style>
+    body { 
+      background-color: #0a0a0a; 
+      color: white; 
+      font-family: monospace; 
+      padding: 10px; 
+      margin: 0;
+    }
+    canvas { 
+      border: 1px solid #555; 
+      margin: 10px 0; 
+      max-width: 100%;
+      height: auto;
+    }
+    .controls { 
+      margin: 10px 0; 
+      font-size: 14px;
+    }
+    .controls label { 
+      display: block; 
+      margin: 5px 0;
+    }
+    .controls input { 
+      width: 100%; 
+      margin: 3px 0;
+    }
+    .info {
+      font-size: 12px;
+      color: #aaa;
+      margin: 5px 0;
+    }
+  </style>
+</head>
+<body>
+  <h2>QED-Like Electromagnetic Simulation</h2>
+  
+  <div class="controls">
+    <label>Coupling γ: <span id="gammaVal">0.03</span>
+      <input type="range" id="gamma" min="0.01" max="0.05" step="0.01" value="0.03">
+    </label>
+    <label>E-field α: <span id="alphaVal">0.001</span>
+      <input type="range" id="alpha" min="0" max="0.003" step="0.001" value="0.001">
+    </label>
+    <label>B-field β: <span id="betaVal">0.002</span>
+      <input type="range" id="beta" min="0" max="0.005" step="0.001" value="0.002">
+    </label>
+  </div>
+  
+  <canvas id="qedCanvas" width="256" height="256"></canvas>
+  
+  <div class="info">
+    Red/Blue: Phase field | Green: Magnetic field
+  </div>
+
+  <script>
+    const canvas = document.getElementById("qedCanvas");
+    const ctx = canvas.getContext("2d");
+    
+    const W = 256;
+    const H = 256;
+    
+    // Simplified field arrays
+    const theta = new Float32Array(W * H);
+    const A_x = new Float32Array(W * H);
+    const A_y = new Float32Array(W * H);
+    const E_x = new Float32Array(W * H);
+    const E_y = new Float32Array(W * H);
+    const B = new Float32Array(W * H);
+    
+    // Helper functions
+    const idx = (x, y) => {
+      x = (x + W) % W;
+      y = (y + H) % H;
+      return y * W + x;
+    };
+    
+    // Initialize with simple patterns
+    function initialize() {
+      const centerX = W * 0.5;
+      const centerY = H * 0.5;
+      
+      for (let y = 0; y < H; y++) {
+        for (let x = 0; x < W; x++) {
+          const i = idx(x, y);
+          const dx = x - centerX;
+          const dy = y - centerY;
+          const r = Math.sqrt(dx*dx + dy*dy);
+          
+          // Simple wave patterns
+          theta[i] = 0.1 * Math.sin(r * 0.05) * Math.cos(x * 0.02);
+          A_x[i] = 0.001 * Math.sin(y * 0.03);
+          A_y[i] = 0.001 * Math.cos(x * 0.03);
+        }
+      }
+    }
+    
+    // Update field values
+    function updateFields() {
+      const gamma = parseFloat(document.getElementById('gamma').value);
+      const alpha = parseFloat(document.getElementById('alpha').value);
+      const beta = parseFloat(document.getElementById('beta').value);
+      
+      // Update display values
+      document.getElementById('gammaVal').textContent = gamma;
+      document.getElementById('alphaVal').textContent = alpha;
+      document.getElementById('betaVal').textContent = beta;
+      
+      // Simple field updates with boundary safety
+      for (let y = 1; y < H - 1; y++) {
+        for (let x = 1; x < W - 1; x++) {
+          const i = idx(x, y);
+          
+          // Simple gradient calculations
+          const grad_theta_x = theta[idx(x+1, y)] - theta[idx(x-1, y)];
+          const grad_theta_y = theta[idx(x, y+1)] - theta[idx(x, y-1)];
+          
+          // Electric field
+          E_x[i] = -grad_theta_x * 0.5 - A_x[i];
+          E_y[i] = -grad_theta_y * 0.5 - A_y[i];
+          
+          // Magnetic field (simplified curl)
+          B[i] = (A_y[idx(x+1, y)] - A_y[idx(x-1, y)]) - 
+                 (A_x[idx(x, y+1)] - A_x[idx(x, y-1)]);
+          B[i] *= 0.25;
+          
+          // Simple Laplacian
+          const lap_theta = theta[idx(x+1, y)] + theta[idx(x-1, y)] + 
+                           theta[idx(x, y+1)] + theta[idx(x, y-1)] - 
+                           4 * theta[i];
+          
+          // Update theta
+          const dTheta = -gamma * lap_theta + 
+                        alpha * (E_x[i] + E_y[i]) + 
+                        beta * B[i];
+          
+          theta[i] += dTheta * 0.1; // Small time step
+          
+          // Update vector potential with damping
+          A_x[i] += 0.01 * E_x[i] - 0.001 * A_x[i];
+          A_y[i] += 0.01 * E_y[i] - 0.001 * A_y[i];
+        }
+      }
+    }
+    
+    // Render the simulation
+    function render() {
+      const imageData = ctx.createImageData(W, H);
+      const data = imageData.data;
+      
+      for (let i = 0; i < theta.length; i++) {
+        // Phase visualization
+        const phase = Math.sin(theta[i]);
+        const red = Math.floor(128 + 127 * phase);
+        const blue = 255 - red;
+        
+        // Magnetic field intensity
+        const magB = Math.abs(B[i]);
+        const green = Math.floor(Math.min(255, magB * 1000));
+        
+        const pixelIndex = i * 4;
+        data[pixelIndex] = red;     // R
+        data[pixelIndex + 1] = green; // G
+        data[pixelIndex + 2] = blue;  // B
+        data[pixelIndex + 3] = 255;   // A
+      }
+      
+      ctx.putImageData(imageData, 0, 0);
+    }
+    
+    // Main animation loop
+    let frameCount = 0;
+    function animate() {
+      try {
+        // Update less frequently to prevent stack overflow
+        if (frameCount % 2 === 0) {
+          updateFields();
+        }
+        render();
+        frameCount++;
+        
+        requestAnimationFrame(animate);
+      } catch (error) {
+        console.error('Animation error:', error);
+        // Stop animation on error
+      }
+    }
+    
+    // Initialize and start
+    initialize();
+    animate();
+  </script>
+</body>
+</html>
