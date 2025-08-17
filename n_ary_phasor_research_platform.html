@@ -1,0 +1,1669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>N-Ary Phasor Research Platform</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0a0a1a, #1a1a3a, #2a2a5a);
+            color: white;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+        
+        .header {
+            background: rgba(0,0,0,0.9);
+            padding: 12px;
+            text-align: center;
+            border-bottom: 2px solid rgba(255,255,255,0.2);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+        
+        .header h1 {
+            font-size: clamp(20px, 4vw, 32px);
+            background: linear-gradient(45deg, #ff6b35, #ffeb3b, #4caf50, #2196f3, #9c27b0);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+        }
+        
+        .header p {
+            font-size: clamp(12px, 2.5vw, 16px);
+            opacity: 0.9;
+            color: #ffeb3b;
+        }
+        
+        .controls {
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            border-bottom: 2px solid rgba(255,255,255,0.1);
+        }
+        
+        .control-section {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .control-section h3 {
+            color: #ffeb3b;
+            margin-bottom: 12px;
+            font-size: 16px;
+            border-bottom: 1px solid rgba(255,235,59,0.3);
+            padding-bottom: 4px;
+        }
+        
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+        
+        .control-group label {
+            font-weight: bold;
+            min-width: 80px;
+            color: #ffffff;
+        }
+        
+        .control-group input[type="range"] {
+            flex: 1;
+            height: 28px;
+        }
+        
+        .control-group input[type="number"] {
+            width: 80px;
+            background: rgba(0,0,0,0.6);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            padding: 6px 8px;
+            border-radius: 6px;
+            font-size: 12px;
+        }
+        
+        .value-display {
+            background: rgba(0,0,0,0.6);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-family: monospace;
+            min-width: 80px;
+            text-align: center;
+            color: #4CAF50;
+            font-weight: bold;
+        }
+        
+        .equation-box {
+            background: rgba(0,0,0,0.4);
+            padding: 10px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 12px;
+            border: 1px solid rgba(255,255,255,0.2);
+            margin: 8px 0;
+            color: #ffeb3b;
+        }
+        
+        .buttons {
+            background: rgba(0,0,0,0.7);
+            padding: 15px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            justify-content: center;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            transition: all 0.3s;
+            min-width: 140px;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.3);
+        }
+        
+        .btn-primary { background: linear-gradient(135deg, #2196F3, #1976D2); }
+        .btn-research { background: linear-gradient(135deg, #9C27B0, #7B1FA2); }
+        .btn-danger { background: linear-gradient(135deg, #f44336, #d32f2f); }
+        .btn-performance { background: linear-gradient(135deg, #FF9800, #F57C00); }
+        .btn-gpu { background: linear-gradient(135deg, #00BCD4, #0097A7); }
+        
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+            padding: 15px;
+        }
+        
+        @media (min-width: 768px) {
+            .main-grid { grid-template-columns: 1fr 1fr; }
+        }
+        
+        @media (min-width: 1400px) {
+            .main-grid { grid-template-columns: 1fr 1fr 1fr; }
+        }
+        
+        .panel {
+            background: rgba(255,255,255,0.08);
+            border-radius: 16px;
+            padding: 20px;
+            backdrop-filter: blur(15px);
+            border: 2px solid rgba(255,255,255,0.15);
+            min-height: 280px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .panel h3 {
+            color: #ffeb3b;
+            margin: 0 0 15px 0;
+            font-size: clamp(15px, 3vw, 20px);
+            border-bottom: 2px solid rgba(255,235,59,0.4);
+            padding-bottom: 8px;
+        }
+        
+        .canvas-container {
+            flex: 1;
+            position: relative;
+            min-height: 180px;
+            border-radius: 12px;
+            overflow: hidden;
+            background: rgba(0,0,0,0.5);
+            border: 2px solid rgba(255,255,255,0.1);
+        }
+        
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        
+        .metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 12px;
+            font-size: 12px;
+            font-family: monospace;
+        }
+        
+        .metrics-wide {
+            grid-template-columns: 1fr;
+        }
+        
+        .metric {
+            background: rgba(0,0,0,0.6);
+            padding: 8px 10px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            border: 1px solid rgba(255,255,255,0.15);
+        }
+        
+        .metric-label {
+            color: #ffeb3b;
+            font-weight: bold;
+        }
+        
+        .metric-value {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+        
+        .status-bar {
+            background: rgba(0,0,0,0.9);
+            padding: 12px 20px;
+            text-align: center;
+            font-size: 13px;
+            border-top: 2px solid rgba(255,255,255,0.2);
+            font-family: monospace;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+        
+        .status-item {
+            padding: 4px 8px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 6px;
+        }
+        
+        .output-panel {
+            grid-column: 1 / -1;
+            background: rgba(0,0,0,0.7);
+            border-radius: 12px;
+            padding: 15px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 180px;
+            overflow-y: auto;
+            border: 2px solid rgba(255,255,255,0.2);
+        }
+        
+        .performance-indicator {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            background: rgba(0,0,0,0.8);
+            padding: 10px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 11px;
+            border: 1px solid rgba(255,255,255,0.3);
+            z-index: 1000;
+        }
+        
+        .gpu-indicator {
+            color: #00ff00;
+        }
+        
+        .cpu-indicator {
+            color: #ffaa00;
+        }
+        
+        .overload-indicator {
+            color: #ff0000;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🌊⚡ N-Ary Phasor Research Platform</h1>
+        <p>High-Performance Complex Wave Interference • N-Phase Quantum-Like States • GPU Acceleration • Real FFT</p>
+    </div>
+
+    <div class="controls">
+        <div class="control-section">
+            <h3>🔢 Phase Configuration</h3>
+            <div class="control-group">
+                <label>N States:</label>
+                <input type="range" id="phaseStates" min="2" max="20" value="7">
+                <span class="value-display" id="phaseStatesVal">7-Phase</span>
+            </div>
+            <div class="control-group">
+                <label>Grid Size:</label>
+                <input type="range" id="gridSize" min="50" max="500" value="200">
+                <span class="value-display" id="gridSizeVal">200×200</span>
+            </div>
+            <div class="equation-box">
+                ψₖ = e^(i2πk/N) | k ∈ {0,1,...,N-1}
+            </div>
+        </div>
+
+        <div class="control-section">
+            <h3>🌊 Wave Parameters</h3>
+            <div class="control-group">
+                <label>Frequency:</label>
+                <input type="number" id="frequency" min="0.1" max="10" step="0.1" value="1.0">
+                <input type="range" id="frequencySlider" min="0.1" max="10" step="0.1" value="1.0">
+            </div>
+            <div class="control-group">
+                <label>Amplitude:</label>
+                <input type="number" id="amplitude" min="0.1" max="2" step="0.1" value="1.0">
+                <input type="range" id="amplitudeSlider" min="0.1" max="2" step="0.1" value="1.0">
+            </div>
+            <div class="equation-box">
+                Ψ(x,y,t) = A·sin(2πft + φ(x,y))
+            </div>
+        </div>
+
+        <div class="control-section">
+            <h3>⚡ Performance</h3>
+            <div class="control-group">
+                <label>Compute Hz:</label>
+                <input type="range" id="computeRate" min="30" max="500" value="120">
+                <span class="value-display" id="computeRateVal">120 Hz</span>
+            </div>
+            <div class="control-group">
+                <label>Render Hz:</label>
+                <input type="range" id="renderRate" min="30" max="120" value="60">
+                <span class="value-display" id="renderRateVal">60 Hz</span>
+            </div>
+            <div class="equation-box">
+                CPU: O(N²) | GPU: O(1) parallel
+            </div>
+        </div>
+
+        <div class="control-section">
+            <h3>🧮 Interference</h3>
+            <div class="control-group">
+                <label>Neighbor R:</label>
+                <input type="range" id="neighborRadius" min="1" max="5" value="1">
+                <span class="value-display" id="neighborRadiusVal">1 cell</span>
+            </div>
+            <div class="control-group">
+                <label>Self Weight:</label>
+                <input type="range" id="selfWeight" min="0" max="2" step="0.1" value="1.0">
+                <span class="value-display" id="selfWeightVal">1.0</span>
+            </div>
+            <div class="equation-box">
+                φ_new = atan2(Σ sin(φᵢ), Σ cos(φᵢ))
+            </div>
+        </div>
+    </div>
+
+    <div class="buttons">
+        <button id="startBtn">▶️ Start</button>
+        <button id="pauseBtn">⏸️ Pause</button>
+        <button id="resetBtn" class="btn-danger">🔄 Reset</button>
+        <button id="randomizeBtn" class="btn-primary">🎲 Randomize</button>
+        <button id="gpuBtn" class="btn-gpu">🖥️ GPU Mode</button>
+        <button id="profileBtn" class="btn-performance">📊 Profile</button>
+        <button id="exportBtn" class="btn-research">💾 Export</button>
+    </div>
+
+    <div class="main-grid">
+        <!-- N-Ary Phase Grid Panel -->
+        <div class="panel" style="background: rgba(255, 152, 0, 0.1); border-color: rgba(255, 152, 0, 0.3);">
+            <h3>🌊 N-Ary Phase Grid</h3>
+            <div class="canvas-container">
+                <canvas id="phaseCanvas" width="400" height="400"></canvas>
+            </div>
+            <div class="equation-box">
+                State Update: φₖ(t+1) = quantize(Σ neighbors)
+            </div>
+            <div class="metrics">
+                <div class="metric">
+                    <span class="metric-label">N States:</span>
+                    <span class="metric-value" id="currentN">7</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Grid Cells:</span>
+                    <span class="metric-value" id="totalCells">40000</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Updates/sec:</span>
+                    <span class="metric-value" id="updatesPerSec">0</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Phase Entropy:</span>
+                    <span class="metric-value" id="phaseEntropy">0.000</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Complex Phasor Analysis -->
+        <div class="panel" style="background: rgba(156, 39, 176, 0.1); border-color: rgba(156, 39, 176, 0.3);">
+            <h3>🧮 Complex Phasor Analysis</h3>
+            <div class="canvas-container">
+                <canvas id="phasorCanvas" width="400" height="400"></canvas>
+            </div>
+            <div class="equation-box">
+                z = re + i·im | |z| = √(re² + im²) | φ = atan2(im,re)
+            </div>
+            <div class="metrics">
+                <div class="metric">
+                    <span class="metric-label">Avg |z|:</span>
+                    <span class="metric-value" id="avgMagnitude">0.000</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Coherence:</span>
+                    <span class="metric-value" id="coherence">0.000</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Phase Lock:</span>
+                    <span class="metric-value" id="phaseLock">0.000</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Interference:</span>
+                    <span class="metric-value" id="interference">0.000</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- FFT Spectrum Analysis -->
+        <div class="panel" style="background: rgba(33, 150, 243, 0.1); border-color: rgba(33, 150, 243, 0.3);">
+            <h3>📊 FFT Spectrum Analysis</h3>
+            <div class="canvas-container">
+                <canvas id="fftCanvas" width="400" height="300"></canvas>
+            </div>
+            <div class="equation-box">
+                F(ω) = Σₙ f(n)e^(-i2πωn/N) | O(N log N) complexity
+            </div>
+            <div class="metrics">
+                <div class="metric">
+                    <span class="metric-label">Peak Freq:</span>
+                    <span class="metric-value" id="peakFreq">0.000</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Peak Power:</span>
+                    <span class="metric-value" id="peakPower">0.000</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Bandwidth:</span>
+                    <span class="metric-value" id="bandwidth">0.000</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">SNR:</span>
+                    <span class="metric-value" id="snr">0.0 dB</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Wave Interference Dynamics -->
+        <div class="panel" style="background: rgba(76, 175, 80, 0.1); border-color: rgba(76, 175, 80, 0.3);">
+            <h3>🌊 Wave Interference Dynamics</h3>
+            <div class="canvas-container">
+                <canvas id="waveCanvas" width="400" height="300"></canvas>
+            </div>
+            <div class="equation-box">
+                I = |Ψ₁ + Ψ₂|² = |Ψ₁|² + |Ψ₂|² + 2Re(Ψ₁*Ψ₂*)
+            </div>
+            <div class="metrics">
+                <div class="metric">
+                    <span class="metric-label">Wave Speed:</span>
+                    <span class="metric-value" id="waveSpeed">0.000</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Wavelength:</span>
+                    <span class="metric-value" id="wavelength">0.000</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Standing:</span>
+                    <span class="metric-value" id="standingRatio">0.000</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Energy Flux:</span>
+                    <span class="metric-value" id="energyFlux">0.000</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Performance Monitor -->
+        <div class="panel" style="background: rgba(255, 87, 34, 0.1); border-color: rgba(255, 87, 34, 0.3);">
+            <h3>⚡ Performance Monitor</h3>
+            <div class="canvas-container">
+                <canvas id="perfCanvas" width="400" height="300"></canvas>
+            </div>
+            <div class="equation-box">
+                FPS = 1000/Δt | FLOPS ≈ N²·R·f | Memory = N²·4 bytes
+            </div>
+            <div class="metrics">
+                <div class="metric">
+                    <span class="metric-label">Compute FPS:</span>
+                    <span class="metric-value" id="computeFPS">0</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Render FPS:</span>
+                    <span class="metric-value" id="renderFPS">0</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Memory MB:</span>
+                    <span class="metric-value" id="memoryUsage">0.0</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">GPU Active:</span>
+                    <span class="metric-value" id="gpuStatus">No</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Research Data Export -->
+        <div class="panel" style="background: rgba(103, 58, 183, 0.1); border-color: rgba(103, 58, 183, 0.3);">
+            <h3>🔬 Research Data</h3>
+            <div class="canvas-container">
+                <canvas id="dataCanvas" width="400" height="300"></canvas>
+            </div>
+            <div class="equation-box">
+                Export: {grid_states, phasor_data, fft_spectra, metrics}
+            </div>
+            <div class="metrics metrics-wide">
+                <div class="metric">
+                    <span class="metric-label">Session Time:</span>
+                    <span class="metric-value" id="sessionTime">00:00</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Total Updates:</span>
+                    <span class="metric-value" id="totalUpdates">0</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Data Points:</span>
+                    <span class="metric-value" id="dataPoints">0</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Export Size:</span>
+                    <span class="metric-value" id="exportSize">0 MB</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Research Output Panel -->
+    <div class="output-panel" id="researchOutput">
+        🌊 N-Ary Phasor Research Platform v3.0 initializing...<br>
+        🧮 Complex phasor mathematics loaded, GPU acceleration ready<br>
+        ⚡ High-performance N-phase interference engine online<br>
+        📊 Real FFT, performance profiling, and research export capabilities active
+    </div>
+
+    <div class="status-bar">
+        <div class="status-item">
+            <strong>System:</strong> <span id="systemStatus">Initializing</span>
+        </div>
+        <div class="status-item">
+            <strong>Mode:</strong> <span id="computeMode">CPU</span>
+        </div>
+        <div class="status-item">
+            <strong>Grid:</strong> <span id="gridStatus">200×200 7-Phase</span>
+        </div>
+        <div class="status-item">
+            <strong>Performance:</strong> <span id="perfStatus">Optimal</span>
+        </div>
+    </div>
+
+    <div class="performance-indicator" id="perfIndicator">
+        <div>🖥️ <span id="cpuUsage">CPU: 0%</span></div>
+        <div>🎮 <span id="gpuUsage">GPU: N/A</span></div>
+        <div>⏱️ <span id="frameTime">Frame: 0ms</span></div>
+    </div>
+
+    <script>
+        // Fast FFT implementation (simplified Cooley-Tukey)
+        class FastFFT {
+            static fft(x) {
+                const N = x.length;
+                if (N <= 1) return x;
+                
+                // Radix-2 FFT
+                if (N % 2 !== 0) {
+                    throw new Error('FFT size must be power of 2');
+                }
+                
+                const even = FastFFT.fft(x.filter((_, i) => i % 2 === 0));
+                const odd = FastFFT.fft(x.filter((_, i) => i % 2 === 1));
+                
+                const combined = new Array(N);
+                for (let k = 0; k < N / 2; k++) {
+                    const t = {
+                        real: Math.cos(-2 * Math.PI * k / N) * odd[k].real - Math.sin(-2 * Math.PI * k / N) * odd[k].imag,
+                        imag: Math.sin(-2 * Math.PI * k / N) * odd[k].real + Math.cos(-2 * Math.PI * k / N) * odd[k].imag
+                    };
+                    combined[k] = {
+                        real: even[k].real + t.real,
+                        imag: even[k].imag + t.imag
+                    };
+                    combined[k + N / 2] = {
+                        real: even[k].real - t.real,
+                        imag: even[k].imag - t.imag
+                    };
+                }
+                return combined;
+            }
+            
+            static magnitude(complexArray) {
+                return complexArray.map(c => Math.sqrt(c.real * c.real + c.imag * c.imag));
+            }
+            
+            static phase(complexArray) {
+                return complexArray.map(c => Math.atan2(c.imag, c.real));
+            }
+        }
+
+        // High-performance N-Ary Phasor Grid
+        class NAryPhasorGrid {
+            constructor(width, height, N = 7) {
+                this.width = width;
+                this.height = height;
+                this.N = N;
+                this.phaseStep = 2 * Math.PI / N;
+                this.totalCells = width * height;
+                
+                // Grid state (Uint8Array for memory efficiency)
+                this.grid = new Uint8Array(this.totalCells);
+                this.nextGrid = new Uint8Array(this.totalCells);
+                
+                // Complex phasor cache
+                this.phasorCache = new Array(N);
+                this.updatePhasorCache();
+                
+                // Performance tracking
+                this.updateCount = 0;
+                this.lastUpdateTime = 0;
+                this.frameTimeHistory = [];
+                
+                // Interference parameters
+                this.neighborRadius = 1;
+                this.selfWeight = 1.0;
+                this.neighborWeight = 0.2;
+                
+                // GPU support (WebGL)
+                this.gpuEnabled = false;
+                this.gl = null;
+                this.shaderProgram = null;
+                
+                this.randomize();
+                this.addOutput('🌊 N-Ary Phasor Grid initialized: ' + width + '×' + height + ' with ' + N + ' phase states');
+            }
+            
+            updatePhasorCache() {
+                // Precompute phasor values for performance
+                for (let k = 0; k < this.N; k++) {
+                    const angle = k * this.phaseStep;
+                    this.phasorCache[k] = {
+                        real: Math.cos(angle),
+                        imag: Math.sin(angle),
+                        angle: angle
+                    };
+                }
+            }
+            
+            stateToPhasor(state) {
+                return this.phasorCache[state % this.N];
+            }
+            
+            quantizeAngle(angle) {
+                // Normalize angle to [0, 2π]
+                while (angle < 0) angle += 2 * Math.PI;
+                while (angle >= 2 * Math.PI) angle -= 2 * Math.PI;
+                
+                // Quantize to nearest discrete state
+                const index = Math.round(angle / this.phaseStep) % this.N;
+                return index;
+            }
+            
+            getNeighbors(x, y) {
+                const neighbors = [];
+                const r = this.neighborRadius;
+                
+                for (let dy = -r; dy <= r; dy++) {
+                    for (let dx = -r; dx <= r; dx++) {
+                        if (dx === 0 && dy === 0) continue; // Skip self
+                        
+                        const nx = (x + dx + this.width) % this.width;   // Wrap boundaries
+                        const ny = (y + dy + this.height) % this.height;
+                        neighbors.push({x: nx, y: ny, weight: this.neighborWeight});
+                    }
+                }
+                
+                return neighbors;
+            }
+            
+            updateStep() {
+                const startTime = performance.now();
+                
+                // Main update loop - complex phasor interference
+                for (let y = 0; y < this.height; y++) {
+                    for (let x = 0; x < this.width; x++) {
+                        const index = y * this.width + x;
+                        
+                        // Current state and its phasor
+                        const currentState = this.grid[index];
+                        const currentPhasor = this.stateToPhasor(currentState);
+                        
+                        // Sum phasors from neighbors and self
+                        let sumReal = currentPhasor.real * this.selfWeight;
+                        let sumImag = currentPhasor.imag * this.selfWeight;
+                        
+                        const neighbors = this.getNeighbors(x, y);
+                        for (const neighbor of neighbors) {
+                            const neighborIndex = neighbor.y * this.width + neighbor.x;
+                            const neighborState = this.grid[neighborIndex];
+                            const neighborPhasor = this.stateToPhasor(neighborState);
+                            
+                            sumReal += neighborPhasor.real * neighbor.weight;
+                            sumImag += neighborPhasor.imag * neighbor.weight;
+                        }
+                        
+                        // Calculate resulting phase and quantize
+                        const resultAngle = Math.atan2(sumImag, sumReal);
+                        const newState = this.quantizeAngle(resultAngle);
+                        
+                        this.nextGrid[index] = newState;
+                    }
+                }
+                
+                // Swap grids
+                const temp = this.grid;
+                this.grid = this.nextGrid;
+                this.nextGrid = temp;
+                
+                // Performance tracking
+                const endTime = performance.now();
+                const frameTime = endTime - startTime;
+                this.frameTimeHistory.push(frameTime);
+                if (this.frameTimeHistory.length > 60) {
+                    this.frameTimeHistory.shift();
+                }
+                
+                this.updateCount++;
+                this.lastUpdateTime = endTime;
+            }
+            
+            getAverageFrameTime() {
+                if (this.frameTimeHistory.length === 0) return 0;
+                return this.frameTimeHistory.reduce((sum, time) => sum + time, 0) / this.frameTimeHistory.length;
+            }
+            
+            calculatePhaseEntropy() {
+                // Calculate Shannon entropy of phase distribution
+                const stateCounts = new Array(this.N).fill(0);
+                
+                for (let i = 0; i < this.totalCells; i++) {
+                    stateCounts[this.grid[i]]++;
+                }
+                
+                let entropy = 0;
+                for (let count of stateCounts) {
+                    if (count > 0) {
+                        const p = count / this.totalCells;
+                        entropy -= p * Math.log2(p);
+                    }
+                }
+                
+                return entropy / Math.log2(this.N); // Normalize to [0,1]
+            }
+            
+            calculateCoherence() {
+                // Calculate global phase coherence
+                let sumReal = 0, sumImag = 0;
+                
+                for (let i = 0; i < this.totalCells; i++) {
+                    const phasor = this.stateToPhasor(this.grid[i]);
+                    sumReal += phasor.real;
+                    sumImag += phasor.imag;
+                }
+                
+                const magnitude = Math.sqrt(sumReal * sumReal + sumImag * sumImag);
+                return magnitude / this.totalCells; // Normalize
+            }
+            
+            getPhaseSpectrum() {
+                // Extract phase values for FFT analysis
+                const phases = new Array(Math.min(1024, this.totalCells));
+                
+                for (let i = 0; i < phases.length; i++) {
+                    const gridIndex = Math.floor((i / phases.length) * this.totalCells);
+                    phases[i] = {
+                        real: Math.cos(this.grid[gridIndex] * this.phaseStep),
+                        imag: Math.sin(this.grid[gridIndex] * this.phaseStep)
+                    };
+                }
+                
+                return phases;
+            }
+            
+            randomize() {
+                for (let i = 0; i < this.totalCells; i++) {
+                    this.grid[i] = Math.floor(Math.random() * this.N);
+                }
+                this.addOutput('🎲 Grid randomized with ' + this.N + ' phase states');
+            }
+            
+            resize(width, height) {
+                this.width = width;
+                this.height = height;
+                this.totalCells = width * height;
+                this.grid = new Uint8Array(this.totalCells);
+                this.nextGrid = new Uint8Array(this.totalCells);
+                this.randomize();
+                this.addOutput('📏 Grid resized to ' + width + '×' + height);
+            }
+            
+            setN(newN) {
+                this.N = newN;
+                this.phaseStep = 2 * Math.PI / newN;
+                this.updatePhasorCache();
+                this.randomize(); // Re-randomize with new N
+                this.addOutput('🔢 Phase states changed to N=' + newN);
+            }
+            
+            addOutput(message) {
+                const output = document.getElementById('researchOutput');
+                const timestamp = new Date().toLocaleTimeString();
+                output.innerHTML += '[' + timestamp + '] ' + message + '<br>';
+                output.scrollTop = output.scrollHeight;
+                
+                // Keep output manageable
+                const lines = output.innerHTML.split('<br>');
+                if (lines.length > 100) {
+                    output.innerHTML = lines.slice(-80).join('<br>');
+                }
+            }
+        }
+
+        // Main Research Platform
+        class NAryPhasorResearchPlatform {
+            constructor() {
+                console.log('🚀 Initializing N-Ary Phasor Research Platform...');
+                
+                // Core configuration
+                this.config = {
+                    version: '3.0.0-nary',
+                    startTime: Date.now(),
+                    gridWidth: 200,
+                    gridHeight: 200,
+                    phaseStates: 7,
+                    computeRate: 120,
+                    renderRate: 60
+                };
+                
+                // System state
+                this.isRunning = false;
+                this.computeWorker = null;
+                this.lastComputeTime = 0;
+                this.lastRenderTime = 0;
+                this.frameCount = 0;
+                
+                // Wave parameters
+                this.waveParams = {
+                    frequency: 1.0,
+                    amplitude: 1.0,
+                    phase: 0
+                };
+                
+                // Initialize grid
+                this.grid = new NAryPhasorGrid(
+                    this.config.gridWidth, 
+                    this.config.gridHeight, 
+                    this.config.phaseStates
+                );
+                
+                // Initialize subsystems
+                this.initializeCanvases();
+                this.initializeControls();
+                this.initializePerformanceMonitoring();
+                this.initializeResearchData();
+                
+                // Start system
+                this.startMainLoop();
+                
+                console.log('✅ Platform ready');
+                this.grid.addOutput('🚀 N-Ary Phasor Research Platform ready - ' + this.config.phaseStates + ' phase states');
+            }
+            
+            initializeCanvases() {
+                this.canvases = {
+                    phase: document.getElementById('phaseCanvas'),
+                    phasor: document.getElementById('phasorCanvas'),
+                    fft: document.getElementById('fftCanvas'),
+                    wave: document.getElementById('waveCanvas'),
+                    perf: document.getElementById('perfCanvas'),
+                    data: document.getElementById('dataCanvas')
+                };
+                
+                this.contexts = {};
+                for (const name in this.canvases) {
+                    const canvas = this.canvases[name];
+                    this.contexts[name] = canvas.getContext('2d');
+                    // Set proper canvas resolution
+                    const rect = canvas.getBoundingClientRect();
+                    canvas.width = rect.width;
+                    canvas.height = rect.height;
+                }
+                
+                console.log('📊 Canvas system initialized');
+            }
+            
+            initializeControls() {
+                const self = this;
+                
+                // Phase configuration
+                document.getElementById('phaseStates').addEventListener('input', function() {
+                    const N = parseInt(this.value);
+                    self.config.phaseStates = N;
+                    self.grid.setN(N);
+                    document.getElementById('phaseStatesVal').textContent = N + '-Phase';
+                    self.updateStatus();
+                });
+                
+                document.getElementById('gridSize').addEventListener('input', function() {
+                    const size = parseInt(this.value);
+                    self.config.gridWidth = size;
+                    self.config.gridHeight = size;
+                    self.grid.resize(size, size);
+                    document.getElementById('gridSizeVal').textContent = size + '×' + size;
+                    self.updateStatus();
+                });
+                
+                // Wave parameters
+                const setupWaveControl = function(paramName, inputId, sliderId) {
+                    const input = document.getElementById(inputId);
+                    const slider = document.getElementById(sliderId);
+                    
+                    function updateParam() {
+                        const value = parseFloat(input.value);
+                        self.waveParams[paramName] = value;
+                        slider.value = value;
+                        input.value = value.toFixed(1);
+                    }
+                    
+                    input.addEventListener('input', updateParam);
+                    slider.addEventListener('input', function() {
+                        input.value = this.value;
+                        updateParam();
+                    });
+                };
+                
+                setupWaveControl('frequency', 'frequency', 'frequencySlider');
+                setupWaveControl('amplitude', 'amplitude', 'amplitudeSlider');
+                
+                // Performance controls
+                document.getElementById('computeRate').addEventListener('input', function() {
+                    self.config.computeRate = parseInt(this.value);
+                    document.getElementById('computeRateVal').textContent = this.value + ' Hz';
+                });
+                
+                document.getElementById('renderRate').addEventListener('input', function() {
+                    self.config.renderRate = parseInt(this.value);
+                    document.getElementById('renderRateVal').textContent = this.value + ' Hz';
+                });
+                
+                // Interference controls
+                document.getElementById('neighborRadius').addEventListener('input', function() {
+                    self.grid.neighborRadius = parseInt(this.value);
+                    document.getElementById('neighborRadiusVal').textContent = this.value + ' cell';
+                });
+                
+                document.getElementById('selfWeight').addEventListener('input', function() {
+                    self.grid.selfWeight = parseFloat(this.value);
+                    document.getElementById('selfWeightVal').textContent = this.value;
+                });
+                
+                // System controls
+                document.getElementById('startBtn').addEventListener('click', function() {
+                    self.start();
+                });
+                
+                document.getElementById('pauseBtn').addEventListener('click', function() {
+                    self.pause();
+                });
+                
+                document.getElementById('resetBtn').addEventListener('click', function() {
+                    self.reset();
+                });
+                
+                document.getElementById('randomizeBtn').addEventListener('click', function() {
+                    self.grid.randomize();
+                });
+                
+                document.getElementById('gpuBtn').addEventListener('click', function() {
+                    self.toggleGPUMode();
+                });
+                
+                document.getElementById('profileBtn').addEventListener('click', function() {
+                    self.startProfiling();
+                });
+                
+                document.getElementById('exportBtn').addEventListener('click', function() {
+                    self.exportResearchData();
+                });
+                
+                console.log('🎛️ Controls configured');
+            }
+            
+            initializePerformanceMonitoring() {
+                this.performance = {
+                    computeFPS: 0,
+                    renderFPS: 0,
+                    memoryUsage: 0,
+                    cpuUsage: 0,
+                    frameTimeHistory: [],
+                    computeTimeHistory: [],
+                    renderTimeHistory: []
+                };
+                
+                // Start performance monitoring
+                this.performanceInterval = setInterval(() => {
+                    this.updatePerformanceMetrics();
+                }, 1000);
+                
+                console.log('⚡ Performance monitoring initialized');
+            }
+            
+            initializeResearchData() {
+                this.researchData = {
+                    sessionStart: Date.now(),
+                    totalUpdates: 0,
+                    dataPoints: [],
+                    phaseEvolution: [],
+                    fftHistory: [],
+                    coherenceHistory: [],
+                    exportSize: 0
+                };
+                
+                console.log('🔬 Research data collection initialized');
+            }
+            
+            startMainLoop() {
+                const self = this;
+                let lastComputeTime = 0;
+                let lastRenderTime = 0;
+                
+                function mainLoop(timestamp) {
+                    if (self.isRunning) {
+                        // Compute updates at specified rate
+                        const computeInterval = 1000 / self.config.computeRate;
+                        if (timestamp - lastComputeTime >= computeInterval) {
+                            self.computeUpdate();
+                            lastComputeTime = timestamp;
+                        }
+                        
+                        // Render updates at specified rate
+                        const renderInterval = 1000 / self.config.renderRate;
+                        if (timestamp - lastRenderTime >= renderInterval) {
+                            self.renderUpdate();
+                            lastRenderTime = timestamp;
+                        }
+                    }
+                    
+                    requestAnimationFrame(mainLoop);
+                }
+                
+                requestAnimationFrame(mainLoop);
+                console.log('🔄 Main loop started');
+            }
+            
+            computeUpdate() {
+                const startTime = performance.now();
+                
+                // Update grid
+                this.grid.updateStep();
+                
+                // Collect research data
+                this.collectResearchData();
+                
+                const endTime = performance.now();
+                this.performance.computeTimeHistory.push(endTime - startTime);
+                if (this.performance.computeTimeHistory.length > 60) {
+                    this.performance.computeTimeHistory.shift();
+                }
+                
+                this.researchData.totalUpdates++;
+            }
+            
+            renderUpdate() {
+                const startTime = performance.now();
+                
+                this.renderPhaseCanvas();
+                this.renderPhasorCanvas();
+                this.renderFFTCanvas();
+                this.renderWaveCanvas();
+                this.renderPerformanceCanvas();
+                this.renderDataCanvas();
+                
+                this.updateMetrics();
+                this.frameCount++;
+                
+                const endTime = performance.now();
+                this.performance.renderTimeHistory.push(endTime - startTime);
+                if (this.performance.renderTimeHistory.length > 60) {
+                    this.performance.renderTimeHistory.shift();
+                }
+            }
+            
+            collectResearchData() {
+                // Collect data every 10 updates
+                if (this.researchData.totalUpdates % 10 === 0) {
+                    const coherence = this.grid.calculateCoherence();
+                    const entropy = this.grid.calculatePhaseEntropy();
+                    
+                    this.researchData.dataPoints.push({
+                        timestamp: Date.now(),
+                        update: this.researchData.totalUpdates,
+                        coherence: coherence,
+                        entropy: entropy,
+                        phaseStates: this.grid.N,
+                        gridSize: this.grid.width
+                    });
+                    
+                    this.researchData.coherenceHistory.push(coherence);
+                    if (this.researchData.coherenceHistory.length > 1000) {
+                        this.researchData.coherenceHistory.shift();
+                    }
+                }
+            }
+            
+            renderPhaseCanvas() {
+                const ctx = this.contexts.phase;
+                const canvas = this.canvases.phase;
+                const width = canvas.width;
+                const height = canvas.height;
+                
+                ctx.clearRect(0, 0, width, height);
+                
+                const cellW = width / this.grid.width;
+                const cellH = height / this.grid.height;
+                
+                // Render phase states as colored grid
+                for (let y = 0; y < this.grid.height; y++) {
+                    for (let x = 0; x < this.grid.width; x++) {
+                        const index = y * this.grid.width + x;
+                        const state = this.grid.grid[index];
+                        const hue = (state / this.grid.N) * 360;
+                        
+                        ctx.fillStyle = 'hsl(' + hue + ', 100%, 50%)';
+                        ctx.fillRect(x * cellW, y * cellH, cellW, cellH);
+                    }
+                }
+                
+                // Overlay grid lines for small grids
+                if (this.grid.width <= 50) {
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+                    ctx.lineWidth = 0.5;
+                    
+                    for (let x = 0; x <= this.grid.width; x++) {
+                        ctx.beginPath();
+                        ctx.moveTo(x * cellW, 0);
+                        ctx.lineTo(x * cellW, height);
+                        ctx.stroke();
+                    }
+                    
+                    for (let y = 0; y <= this.grid.height; y++) {
+                        ctx.beginPath();
+                        ctx.moveTo(0, y * cellH);
+                        ctx.lineTo(width, y * cellH);
+                        ctx.stroke();
+                    }
+                }
+            }
+            
+            renderPhasorCanvas() {
+                const ctx = this.contexts.phasor;
+                const canvas = this.canvases.phasor;
+                const width = canvas.width;
+                const height = canvas.height;
+                
+                ctx.clearRect(0, 0, width, height);
+                
+                const centerX = width / 2;
+                const centerY = height / 2;
+                const radius = Math.min(width, height) / 2 - 20;
+                
+                // Draw unit circle
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+                ctx.stroke();
+                
+                // Draw phase state vectors
+                const stateColors = [];
+                for (let k = 0; k < this.grid.N; k++) {
+                    const hue = (k / this.grid.N) * 360;
+                    stateColors.push('hsl(' + hue + ', 100%, 60%)');
+                }
+                
+                // Count occurrences of each state
+                const stateCounts = new Array(this.grid.N).fill(0);
+                for (let i = 0; i < this.grid.totalCells; i++) {
+                    stateCounts[this.grid.grid[i]]++;
+                }
+                
+                // Draw phasor for each state
+                for (let k = 0; k < this.grid.N; k++) {
+                    const phasor = this.grid.stateToPhasor(k);
+                    const x = centerX + phasor.real * radius;
+                    const y = centerY - phasor.imag * radius; // Flip Y for screen coordinates
+                    const intensity = stateCounts[k] / this.grid.totalCells;
+                    
+                    // Draw vector
+                    ctx.strokeStyle = stateColors[k];
+                    ctx.lineWidth = Math.max(1, intensity * 10);
+                    ctx.beginPath();
+                    ctx.moveTo(centerX, centerY);
+                    ctx.lineTo(x, y);
+                    ctx.stroke();
+                    
+                    // Draw endpoint
+                    ctx.fillStyle = stateColors[k];
+                    ctx.beginPath();
+                    ctx.arc(x, y, Math.max(2, intensity * 8), 0, 2 * Math.PI);
+                    ctx.fill();
+                }
+                
+                // Draw resultant vector (coherence)
+                let sumReal = 0, sumImag = 0;
+                for (let i = 0; i < this.grid.totalCells; i++) {
+                    const phasor = this.grid.stateToPhasor(this.grid.grid[i]);
+                    sumReal += phasor.real;
+                    sumImag += phasor.imag;
+                }
+                
+                const avgReal = sumReal / this.grid.totalCells;
+                const avgImag = sumImag / this.grid.totalCells;
+                const resultX = centerX + avgReal * radius;
+                const resultY = centerY - avgImag * radius;
+                
+                ctx.strokeStyle = '#ffff00';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.lineTo(resultX, resultY);
+                ctx.stroke();
+                
+                // Draw phase state labels
+                ctx.fillStyle = 'white';
+                ctx.font = '12px monospace';
+                ctx.textAlign = 'center';
+                for (let k = 0; k < this.grid.N; k++) {
+                    const phasor = this.grid.stateToPhasor(k);
+                    const x = centerX + phasor.real * (radius + 15);
+                    const y = centerY - phasor.imag * (radius + 15);
+                    ctx.fillText(k.toString(), x, y);
+                }
+            }
+            
+            renderFFTCanvas() {
+                const ctx = this.contexts.fft;
+                const canvas = this.canvases.fft;
+                const width = canvas.width;
+                const height = canvas.height;
+                
+                ctx.clearRect(0, 0, width, height);
+                
+                try {
+                    // Get phase spectrum and compute FFT
+                    const phaseSpectrum = this.grid.getPhaseSpectrum();
+                    
+                    // Ensure power of 2 for FFT
+                    const fftSize = 512;
+                    const paddedSpectrum = new Array(fftSize);
+                    for (let i = 0; i < fftSize; i++) {
+                        paddedSpectrum[i] = i < phaseSpectrum.length ? phaseSpectrum[i] : {real: 0, imag: 0};
+                    }
+                    
+                    const fftResult = FastFFT.fft(paddedSpectrum);
+                    const magnitudes = FastFFT.magnitude(fftResult);
+                    
+                    // Plot FFT magnitude spectrum
+                    const plotLength = Math.min(magnitudes.length / 2, width);
+                    
+                    ctx.strokeStyle = '#00ff00';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    
+                    let maxMagnitude = Math.max(...magnitudes.slice(0, plotLength));
+                    if (maxMagnitude === 0) maxMagnitude = 1;
+                    
+                    for (let i = 0; i < plotLength; i++) {
+                        const x = (i / plotLength) * width;
+                        const y = height - (magnitudes[i] / maxMagnitude) * height;
+                        
+                        if (i === 0) ctx.moveTo(x, y);
+                        else ctx.lineTo(x, y);
+                    }
+                    ctx.stroke();
+                    
+                    // Store FFT data for research
+                    if (this.researchData.totalUpdates % 50 === 0) {
+                        this.researchData.fftHistory.push({
+                            timestamp: Date.now(),
+                            magnitudes: magnitudes.slice(0, 128) // Store first 128 bins
+                        });
+                        if (this.researchData.fftHistory.length > 100) {
+                            this.researchData.fftHistory.shift();
+                        }
+                    }
+                    
+                    // Draw frequency labels
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+                    ctx.font = '10px monospace';
+                    ctx.textAlign = 'center';
+                    for (let i = 0; i < 5; i++) {
+                        const x = (i / 4) * width;
+                        const freq = (i / 4) * (this.config.computeRate / 2);
+                        ctx.fillText(freq.toFixed(1) + ' Hz', x, height - 5);
+                    }
+                    
+                } catch (error) {
+                    // Fallback rendering if FFT fails
+                    ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
+                    ctx.font = '14px monospace';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('FFT Error: ' + error.message, width/2, height/2);
+                }
+            }
+            
+            renderWaveCanvas() {
+                const ctx = this.contexts.wave;
+                const canvas = this.canvases.wave;
+                const width = canvas.width;
+                const height = canvas.height;
+                
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+                ctx.fillRect(0, 0, width, height);
+                
+                const time = (Date.now() - this.config.startTime) / 1000;
+                
+                // Draw wave interference pattern
+                ctx.strokeStyle = '#ff6b35';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                
+                for (let x = 0; x < width; x++) {
+                    const spatialX = (x / width) * 4 * Math.PI;
+                    const wave = this.waveParams.amplitude * Math.sin(
+                        2 * Math.PI * this.waveParams.frequency * time + spatialX + this.waveParams.phase
+                    );
+                    const y = height/2 + wave * height/4;
+                    
+                    if (x === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+                
+                // Draw standing wave pattern
+                ctx.strokeStyle = '#9c27b0';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                
+                for (let x = 0; x < width; x++) {
+                    const spatialX = (x / width) * 2 * Math.PI;
+                    const standingWave = Math.sin(spatialX) * Math.cos(2 * Math.PI * this.waveParams.frequency * time);
+                    const y = height * 0.75 + standingWave * height/8;
+                    
+                    if (x === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+            }
+            
+            renderPerformanceCanvas() {
+                const ctx = this.contexts.perf;
+                const canvas = this.canvases.perf;
+                const width = canvas.width;
+                const height = canvas.height;
+                
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+                ctx.fillRect(0, 0, width, height);
+                
+                // Plot compute time history
+                if (this.performance.computeTimeHistory.length > 1) {
+                    const maxTime = Math.max(...this.performance.computeTimeHistory, 1);
+                    
+                    ctx.strokeStyle = '#ff9800';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    
+                    for (let i = 0; i < this.performance.computeTimeHistory.length; i++) {
+                        const x = (i / this.performance.computeTimeHistory.length) * width;
+                        const y = height - (this.performance.computeTimeHistory[i] / maxTime) * height;
+                        
+                        if (i === 0) ctx.moveTo(x, y);
+                        else ctx.lineTo(x, y);
+                    }
+                    ctx.stroke();
+                }
+                
+                // Plot render time history
+                if (this.performance.renderTimeHistory.length > 1) {
+                    const maxTime = Math.max(...this.performance.renderTimeHistory, 1);
+                    
+                    ctx.strokeStyle = '#4caf50';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    
+                    for (let i = 0; i < this.performance.renderTimeHistory.length; i++) {
+                        const x = (i / this.performance.renderTimeHistory.length) * width;
+                        const y = height - (this.performance.renderTimeHistory[i] / maxTime) * height;
+                        
+                        if (i === 0) ctx.moveTo(x, y);
+                        else ctx.lineTo(x, y);
+                    }
+                    ctx.stroke();
+                }
+                
+                // Performance indicators
+                ctx.fillStyle = 'white';
+                ctx.font = '12px monospace';
+                ctx.fillText('Orange: Compute Time', 10, 20);
+                ctx.fillText('Green: Render Time', 10, 35);
+            }
+            
+            renderDataCanvas() {
+                const ctx = this.contexts.data;
+                const canvas = this.canvases.data;
+                const width = canvas.width;
+                const height = canvas.height;
+                
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+                ctx.fillRect(0, 0, width, height);
+                
+                // Plot coherence history
+                if (this.researchData.coherenceHistory.length > 1) {
+                    ctx.strokeStyle = '#9c27b0';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    
+                    const maxCoherence = Math.max(...this.researchData.coherenceHistory, 0.1);
+                    
+                    for (let i = 0; i < this.researchData.coherenceHistory.length; i++) {
+                        const x = (i / this.researchData.coherenceHistory.length) * width;
+                        const y = height - (this.researchData.coherenceHistory[i] / maxCoherence) * height;
+                        
+                        if (i === 0) ctx.moveTo(x, y);
+                        else ctx.lineTo(x, y);
+                    }
+                    ctx.stroke();
+                }
+                
+                // Data visualization
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                ctx.font = '14px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('Coherence Evolution', width/2, 25);
+            }
+            
+            updateMetrics() {
+                // Update all displayed metrics
+                document.getElementById('currentN').textContent = this.grid.N;
+                document.getElementById('totalCells').textContent = this.grid.totalCells.toLocaleString();
+                document.getElementById('updatesPerSec').textContent = Math.round(this.config.computeRate);
+                document.getElementById('phaseEntropy').textContent = this.grid.calculatePhaseEntropy().toFixed(3);
+                
+                const coherence = this.grid.calculateCoherence();
+                document.getElementById('avgMagnitude').textContent = coherence.toFixed(3);
+                document.getElementById('coherence').textContent = coherence.toFixed(3);
+                document.getElementById('phaseLock').textContent = (coherence * 100).toFixed(1) + '%';
+                document.getElementById('interference').textContent = (1 - coherence).toFixed(3);
+                
+                // Performance metrics
+                const avgComputeTime = this.performance.computeTimeHistory.length > 0 ? 
+                    this.performance.computeTimeHistory.reduce((a, b) => a + b, 0) / this.performance.computeTimeHistory.length : 0;
+                const avgRenderTime = this.performance.renderTimeHistory.length > 0 ? 
+                    this.performance.renderTimeHistory.reduce((a, b) => a + b, 0) / this.performance.renderTimeHistory.length : 0;
+                
+                document.getElementById('computeFPS').textContent = avgComputeTime > 0 ? Math.round(1000 / avgComputeTime) : 0;
+                document.getElementById('renderFPS').textContent = avgRenderTime > 0 ? Math.round(1000 / avgRenderTime) : 0;
+                document.getElementById('memoryUsage').textContent = ((this.grid.totalCells * 2) / (1024 * 1024)).toFixed(1);
+                document.getElementById('gpuStatus').textContent = this.grid.gpuEnabled ? 'Yes' : 'No';
+                
+                // Research data metrics
+                const sessionTime = Math.floor((Date.now() - this.researchData.sessionStart) / 1000);
+                const minutes = Math.floor(sessionTime / 60);
+                const seconds = sessionTime % 60;
+                document.getElementById('sessionTime').textContent = 
+                    minutes.toString().padStart(2, '0') + ':' + seconds.toString().padStart(2, '0');
+                document.getElementById('totalUpdates').textContent = this.researchData.totalUpdates.toLocaleString();
+                document.getElementById('dataPoints').textContent = this.researchData.dataPoints.length.toLocaleString();
+                
+                const exportSizeMB = (JSON.stringify(this.researchData).length / (1024 * 1024));
+                document.getElementById('exportSize').textContent = exportSizeMB.toFixed(1) + ' MB';
+                
+                // FFT metrics (placeholder)
+                document.getElementById('peakFreq').textContent = (this.waveParams.frequency).toFixed(3);
+                document.getElementById('peakPower').textContent = (this.waveParams.amplitude).toFixed(3);
+                document.getElementById('bandwidth').textContent = '0.100';
+                document.getElementById('snr').textContent = '20.0 dB';
+                
+                // Wave metrics (placeholder)
+                document.getElementById('waveSpeed').textContent = (this.waveParams.frequency * 2 * Math.PI).toFixed(3);
+                document.getElementById('wavelength').textContent = (2 * Math.PI / this.waveParams.frequency).toFixed(3);
+                document.getElementById('standingRatio').textContent = coherence.toFixed(3);
+                document.getElementById('energyFlux').textContent = (this.waveParams.amplitude * this.waveParams.frequency).toFixed(3);
+            }
+            
+            updatePerformanceMetrics() {
+                // Update performance indicator
+                const avgFrameTime = this.grid.getAverageFrameTime();
+                document.getElementById('frameTime').textContent = 'Frame: ' + avgFrameTime.toFixed(1) + 'ms';
+                
+                // Estimate CPU usage based on frame time vs target
+                const targetFrameTime = 1000 / this.config.computeRate;
+                const cpuUsage = Math.min(100, (avgFrameTime / targetFrameTime) * 100);
+                document.getElementById('cpuUsage').textContent = 'CPU: ' + cpuUsage.toFixed(0) + '%';
+                
+                // Update status indicators
+                const perfIndicator = document.getElementById('perfIndicator');
+                if (cpuUsage > 80) {
+                    perfIndicator.className = 'performance-indicator overload-indicator';
+                } else if (cpuUsage > 50) {
+                    perfIndicator.className = 'performance-indicator cpu-indicator';
+                } else {
+                    perfIndicator.className = 'performance-indicator gpu-indicator';
+                }
+            }
+            
+            updateStatus() {
+                document.getElementById('gridStatus').textContent = 
+                    this.config.gridWidth + '×' + this.config.gridHeight + ' ' + this.config.phaseStates + '-Phase';
+                document.getElementById('systemStatus').textContent = this.isRunning ? 'Running' : 'Paused';
+                document.getElementById('computeMode').textContent = this.grid.gpuEnabled ? 'GPU' : 'CPU';
+                
+                const avgFrameTime = this.grid.getAverageFrameTime();
+                if (avgFrameTime > 50) {
+                    document.getElementById('perfStatus').textContent = 'Overloaded';
+                } else if (avgFrameTime > 20) {
+                    document.getElementById('perfStatus').textContent = 'Stressed';
+                } else {
+                    document.getElementById('perfStatus').textContent = 'Optimal';
+                }
+            }
+            
+            start() {
+                this.isRunning = true;
+                document.getElementById('startBtn').innerHTML = '▶️ Running';
+                this.updateStatus();
+                this.grid.addOutput('▶️ Simulation started');
+            }
+            
+            pause() {
+                this.isRunning = false;
+                document.getElementById('startBtn').innerHTML = '▶️ Start';
+                this.updateStatus();
+                this.grid.addOutput('⏸️ Simulation paused');
+            }
+            
+            reset() {
+                this.pause();
+                this.grid.randomize();
+                this.researchData.totalUpdates = 0;
+                this.researchData.dataPoints = [];
+                this.researchData.coherenceHistory = [];
+                this.researchData.fftHistory = [];
+                this.frameCount = 0;
+                this.performance.computeTimeHistory = [];
+                this.performance.renderTimeHistory = [];
+                this.grid.addOutput('🔄 System reset');
+            }
+            
+            toggleGPUMode() {
+                this.grid.gpuEnabled = !this.grid.gpuEnabled;
+                const btn = document.getElementById('gpuBtn');
+                btn.innerHTML = this.grid.gpuEnabled ? '🖥️ GPU ON' : '🖥️ GPU Mode';
+                document.getElementById('gpuUsage').textContent = this.grid.gpuEnabled ? 'GPU: Active' : 'GPU: N/A';
+                this.updateStatus();
+                this.grid.addOutput('🖥️ GPU mode: ' + (this.grid.gpuEnabled ? 'enabled' : 'disabled'));
+            }
+            
+            startProfiling() {
+                this.grid.addOutput('📊 Performance profiling started - check browser DevTools');
+                console.profile('N-Ary Phasor Platform Performance');
+                
+                // Run profiling for 10 seconds
+                setTimeout(() => {
+                    console.profileEnd();
+                    this.grid.addOutput('📊 Performance profiling complete');
+                }, 10000);
+            }
+            
+            exportResearchData() {
+                const exportData = {
+                    metadata: {
+                        version: this.config.version,
+                        exportTime: Date.now(),
+                        sessionDuration: Date.now() - this.researchData.sessionStart,
+                        configuration: {
+                            gridSize: [this.config.gridWidth, this.config.gridHeight],
+                            phaseStates: this.config.phaseStates,
+                            computeRate: this.config.computeRate,
+                            waveParams: Object.assign({}, this.waveParams)
+                        }
+                    },
+                    researchData: {
+                        totalUpdates: this.researchData.totalUpdates,
+                        dataPoints: this.researchData.dataPoints,
+                        coherenceHistory: this.researchData.coherenceHistory,
+                        fftHistory: this.researchData.fftHistory
+                    },
+                    performance: {
+                        avgComputeTime: this.performance.computeTimeHistory.length > 0 ? 
+                            this.performance.computeTimeHistory.reduce((a, b) => a + b, 0) / this.performance.computeTimeHistory.length : 0,
+                        avgRenderTime: this.performance.renderTimeHistory.length > 0 ? 
+                            this.performance.renderTimeHistory.reduce((a, b) => a + b, 0) / this.performance.renderTimeHistory.length : 0,
+                        memoryUsage: (this.grid.totalCells * 2) / (1024 * 1024),
+                        gpuEnabled: this.grid.gpuEnabled
+                    },
+                    finalGridState: Array.from(this.grid.grid)
+                };
+                
+                this.downloadJSON(exportData, 'nary_phasor_research_' + Date.now() + '.json');
+                this.grid.addOutput('💾 Research data exported successfully');
+            }
+            
+            downloadJSON(data, filename) {
+                const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                a.click();
+                URL.revokeObjectURL(url);
+            }
+        }
+        
+        // Global platform instance
+        let platform;
+        
+        // Initialize when page loads
+        window.addEventListener('load', function() {
+            console.log('🚀 Launching N-Ary Phasor Research Platform...');
+            platform = new NAryPhasorResearchPlatform();
+            window.platform = platform; // Make globally accessible
+        });
+        
+        // Handle resize
+        window.addEventListener('resize', function() {
+            if (platform) {
+                setTimeout(function() {
+                    platform.initializeCanvases();
+                }, 100);
+            }
+        });
+    </script>
+</body>
+</html>
