@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Phase Coherence → Curvature Visualization (XY-inspired)</title>
+  <style>
+    :root {
+      --bg: #1a1a1a; --panel: #2a2a2a; --ink:#fff; --muted:#aaa; --acc:#4fc3f7;
+      --outline:#444; --note:#1e3a4a;
+    }
+    * { box-sizing: border-box; }
+    body { margin:0; padding:20px; background:var(--bg); color:var(--ink); font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; line-height:1.4 }
+    .container { max-width: 1400px; margin: 0 auto; }
+    h1 { text-align:center; color:var(--acc); margin: 0 0 8px; font-size: clamp(1.3rem, 2.6vw, 2.2rem) }
+    .subtitle { text-align:center; color:var(--muted); margin:0 0 20px; font-style: italic }
+
+    .controls { background:var(--panel); padding:16px; border-radius:10px; display:flex; flex-wrap:wrap; gap:14px; align-items:center; justify-content:center; margin-bottom:18px }
+    .group { display:flex; flex-direction:column; align-items:center; gap:4px }
+    label { font-size:12px; color:#ddd }
+    input[type="range"], select { width:160px }
+    input[type="range"] { accent-color: var(--acc) }
+    button { background:var(--acc); color:#00222f; border:none; padding:10px 14px; border-radius:8px; font-weight:700; cursor:pointer }
+    button.secondary { background:#2f9ac7; color:#00161e }
+    button:disabled { opacity:.6; cursor:not-allowed }
+
+    .viz { display:grid; grid-template-columns: 1fr 1fr 1fr; gap:18px; margin-bottom:18px }
+    .panel { background:var(--panel); border-radius:10px; padding:12px; text-align:center }
+    .panel h3 { margin:0 0 8px; color:var(--acc); font-size:1rem }
+    canvas { border:1px solid var(--outline); border-radius:6px; width:100%; max-width:420px; height:auto; image-rendering: pixelated }
+    .hint { font-size:12px; color:var(--muted); margin-top:6px }
+
+    .stats { background:var(--panel); padding:12px; border-radius:10px; display:grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap:12px }
+    .stat { text-align:center }
+    .stat .val { font-size:1.4rem; color:var(--acc); font-weight:800 }
+    .stat .lbl { color:var(--muted); font-size:12px }
+
+    .note { background:var(--note); border-left:4px solid var(--acc); padding:12px; border-radius:0 8px 8px 0; margin-top:18px }
+
+    @media (max-width: 1100px) { .viz { grid-template-columns: 1fr } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Phase Coherence → Curvature Visualization</h1>
+    <p class="subtitle">Order-parameter sandbox (XY-inspired). Visualizes |Φ| and either −Δ|Φ| (curvature) or a Poisson potential from a coherence-derived density. <strong>Not a physical gravity solver.</strong></p>
+
+    <div class="controls">
+      <div class="group">
+        <label for="gridSize">Grid Size</label>
+        <input id="gridSize" type="range" min="50" max="150" step="10" value="100" />
+        <span id="gridSizeVal">100</span>
+      </div>
+      <div class="group">
+        <label for="kernelSize">Coherence Kernel</label>
+        <input id="kernelSize" type="range" min="3" max="17" step="2" value="9" />
+        <span id="kernelSizeVal">9</span>
+      </div>
+      <div class="group">
+        <label for="kernelType">Kernel Type</label>
+        <select id="kernelType">
+          <option value="box">Box</option>
+          <option value="gauss" selected>Gaussian</option>
+        </select>
+      </div>
+      <div class="group">
+        <label for="phaseVar">Phase Disorder</label>
+        <input id="phaseVar" type="range" min="0.1" max="3" step="0.1" value="1.0" />
+        <span id="phaseVarVal">1.0</span>
+      </div>
+      <div class="group">
+        <label for="potentialMode">Potential Mode</label>
+        <select id="potentialMode">
+          <option value="curvature" selected>Curvature: −Δ|Φ|</option>
+          <option value="poisson">Poisson: Δφ = ρ</option>
+        </select>
+      </div>
+      <div class="group">
+        <label for="densityMode">ρ (if Poisson)</label>
+        <select id="densityMode">
+          <option value="oneMinusPhi" selected>ρ = 1 − |Φ|</option>
+          <option value="gradTheta">ρ = ½|∇θ|²</option>
+        </select>
+      </div>
+      <div class="group">
+        <label for="iters">Poisson Iterations</label>
+        <input id="iters" type="range" min="50" max="800" step="50" value="300" />
+        <span id="itersVal">300</span>
+      </div>
+      <button id="randomize">Randomize Phases</button>
+      <button id="seed">Create Coherent Domain</button>
+    </div>
+
+    <div class="viz">
+      <div class="panel">
+        <h3>Phase Field θ(x,y)</h3>
+        <canvas id="phaseCanvas" width="320" height="320"></canvas>
+        <p class="hint">Hue encodes angle (0..2π). Toroidal wrap.</p>
+      </div>
+      <div class="panel">
+        <h3>Local Coherence |Φ|</h3>
+        <canvas id="cohCanvas" width="320" height="320"></canvas>
+        <p class="hint">Circular mean of e^{iθ} over the selected kernel.</p>
+      </div>
+      <div class="panel">
+        <h3 id="potTitle">Curvature-derived Potential (−Δ|Φ|)</h3>
+        <canvas id="potCanvas" width="320" height="320"></canvas>
+        <p class="hint" id="potHint">Blue = wells (negative), Red = hills (positive).</p>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><div class="val" id="avgC">0.000</div><div class="lbl">Average |Φ|</div></div>
+      <div class="stat"><div class="val" id="maxP">0.000</div><div class="lbl">Max |potential| (relative)</div></div>
+      <div class="stat"><div class="val" id="hiFrac">0.0%</div><div class="lbl">Highly coherent pixels (&gt;0.8)</div></div>
+      <div class="stat"><div class="val" id="wells">0</div><div class="lbl">Wells detected (local minima)</div></div>
+    </div>
+
+    <div class="note">
+      <strong>Notes</strong>
+      <ul>
+        <li>This is an <em>analogy</em>: we visualize curvature of an order parameter (|Φ|) and an optional Poisson potential solved from a chosen pseudo-density ρ. It is not Newtonian gravity.</li>
+        <li>ρ choices: <code>1 − |Φ|</code> (disorder density) or <code>½|∇θ|²</code> (XY energy proxy). Periodic (toroidal) boundary conditions.</li>
+      </ul>
+    </div>
+  </div>
+
+  <script>
+    // Utility helpers
+    const mod = (a,n)=> (a % n + n) % n;
+    const angleDiff = (a,b) => { // wrap to (−π,π]
+      let d = a - b; d = (d + Math.PI) % (2*Math.PI) - Math.PI; return d;
+    };
+
+    class CoherenceCurvatureViz {
+      constructor() {
+        // Params
+        this.N = parseInt(document.getElementById('gridSize').value);
+        this.kernelSize = parseInt(document.getElementById('kernelSize').value);
+        this.kernelType = document.getElementById('kernelType').value; // 'box' | 'gauss'
+        this.phaseVar = parseFloat(document.getElementById('phaseVar').value);
+        this.potentialMode = document.getElementById('potentialMode').value; // 'curvature' | 'poisson'
+        this.densityMode = document.getElementById('densityMode').value; // 'oneMinusPhi' | 'gradTheta'
+        this.iters = parseInt(document.getElementById('iters').value);
+
+        // Fields
+        this.theta = this.alloc(this.N); // radians
+        this.phiMag = this.alloc(this.N); // |Φ|
+        this.potential = this.alloc(this.N); // −Δ|Φ| or φ
+
+        // Canvases
+        this.phaseCtx = document.getElementById('phaseCanvas').getContext('2d');
+        this.cohCtx   = document.getElementById('cohCanvas').getContext('2d');
+        this.potCtx   = document.getElementById('potCanvas').getContext('2d');
+
+        // Precompute kernel weights (gauss)
+        this.buildKernel();
+
+        // Init & first render
+        this.randomizePhases();
+        this.computeAll();
+        this.renderAll();
+
+        this.bindUI();
+      }
+
+      alloc(N){ return Array.from({length:N},()=>new Float32Array(N)); }
+
+      bindUI(){
+        const gS = document.getElementById('gridSize');
+        const kS = document.getElementById('kernelSize');
+        const kT = document.getElementById('kernelType');
+        const pV = document.getElementById('phaseVar');
+        const pM = document.getElementById('potentialMode');
+        const dM = document.getElementById('densityMode');
+        const it = document.getElementById('iters');
+
+        gS.addEventListener('input', e=>{
+          this.N = parseInt(e.target.value); document.getElementById('gridSizeVal').textContent = this.N;
+          this.theta = this.alloc(this.N); this.phiMag = this.alloc(this.N); this.potential = this.alloc(this.N);
+          this.randomizePhases(); this.computeAll(); this.renderAll();
+        });
+        kS.addEventListener('input', e=>{ this.kernelSize = parseInt(e.target.value); document.getElementById('kernelSizeVal').textContent = this.kernelSize; this.buildKernel(); this.computeAll(); this.renderAll(); });
+        kT.addEventListener('change', e=>{ this.kernelType = e.target.value; this.buildKernel(); this.computeAll(); this.renderAll(); });
+        pV.addEventListener('input', e=>{ this.phaseVar = parseFloat(e.target.value); document.getElementById('phaseVarVal').textContent = this.phaseVar.toFixed(1); this.randomizePhases(); this.computeAll(); this.renderAll(); });
+        pM.addEventListener('change', e=>{ this.potentialMode = e.target.value; this.updatePotLabels(); this.computePotential(); this.renderPotential(); this.updateStats(); });
+        dM.addEventListener('change', e=>{ this.densityMode = e.target.value; if(this.potentialMode==='poisson'){ this.computePotential(); this.renderPotential(); this.updateStats(); } });
+        it.addEventListener('input', e=>{ this.iters = parseInt(e.target.value); document.getElementById('itersVal').textContent = this.iters; if(this.potentialMode==='poisson'){ this.computePotential(); this.renderPotential(); this.updateStats(); } });
+
+        document.getElementById('randomize').addEventListener('click', ()=>{ this.randomizePhases(); this.computeAll(); this.renderAll(); });
+        document.getElementById('seed').addEventListener('click', ()=>{ this.seedCoherentDomain(); this.computeAll(); this.renderAll(); });
+      }
+
+      updatePotLabels(){
+        const title = document.getElementById('potTitle');
+        const hint = document.getElementById('potHint');
+        if (this.potentialMode==='curvature') {
+          title.textContent = 'Curvature-derived Potential (−Δ|Φ|)';
+          hint.textContent = 'Blue = wells (negative), Red = hills (positive).';
+        } else {
+          title.textContent = 'Poisson Potential (Δφ = ρ)';
+          hint.textContent = 'ρ from coherence; blue = minima, red = maxima (relative units).';
+        }
+      }
+
+      buildKernel(){
+        const R = Math.floor(this.kernelSize/2);
+        if(this.kernelType==='gauss'){
+          const sigma = this.kernelSize/2; // soft
+          this.kernel = [];
+          let W = 0;
+          for(let dy=-R; dy<=R; dy++){
+            const row=[]; this.kernel.push(row);
+            for(let dx=-R; dx<=R; dx++){
+              const w = Math.exp(-(dx*dx+dy*dy)/(2*sigma*sigma)); row.push(w); W+=w;
+            }
+          }
+          // normalize
+          for(let y=0;y<this.kernel.length;y++) for(let x=0;x<this.kernel[y].length;x++) this.kernel[y][x]/=W;
+        } else {
+          // box kernel
+          const w = 1/(this.kernelSize*this.kernelSize);
+          this.kernel = Array.from({length:this.kernelSize},()=>Array.from({length:this.kernelSize},()=>w));
+        }
+      }
+
+      randomizePhases(){
+        for(let i=0;i<this.N;i++) for(let j=0;j<this.N;j++){
+          // random angle with tunable spread
+          this.theta[i][j] = (Math.random()-0.5)*2*Math.PI * this.phaseVar;
+        }
+      }
+
+      seedCoherentDomain(){
+        const cx = Math.floor(this.N/2), cy = Math.floor(this.N/2);
+        const R = Math.floor(this.N/4);
+        const target = Math.random()*2*Math.PI;
+        for(let i=0;i<this.N;i++) for(let j=0;j<this.N;j++){
+          const dx = i-cx, dy = j-cy; const d = Math.hypot(dx,dy);
+          if(d<R){
+            const r = Math.exp(- (d*d) / (R*R/3)); // smooth core
+            const z0 = {x: Math.cos(this.theta[i][j]), y: Math.sin(this.theta[i][j])};
+            const zt = {x: Math.cos(target), y: Math.sin(target)};
+            const z  = {x: r*zt.x + (1-r)*z0.x, y: r*zt.y + (1-r)*z0.y};
+            this.theta[i][j] = Math.atan2(z.y, z.x);
+          }
+        }
+      }
+
+      computeAll(){ this.computeCoherence(); this.computePotential(); this.updateStats(); }
+
+      computeCoherence(){
+        const N=this.N, R=Math.floor(this.kernelSize/2), K=this.kernel;
+        for(let i=0;i<N;i++){
+          for(let j=0;j<N;j++){
+            let xr=0, yi=0; // sum of unit phasors
+            let idx=0;
+            for(let dy=-R; dy<=R; dy++){
+              for(let dx=-R; dx<=R; dx++){
+                const ii = mod(i+dy,N), jj = mod(j+dx,N);
+                const th = this.theta[ii][jj];
+                const w = K[dy+R][dx+R];
+                xr += w*Math.cos(th); yi += w*Math.sin(th); idx++;
+              }
+            }
+            this.phiMag[i][j] = Math.hypot(xr, yi); // |⟨e^{iθ}⟩|
+          }
+        }
+      }
+
+      computePotential(){
+        if(this.potentialMode==='curvature'){
+          this.computeCurvaturePotential();
+        } else {
+          // build density and solve Poisson
+          const rho = this.alloc(this.N);
+          if(this.densityMode==='oneMinusPhi'){
+            for(let i=0;i<this.N;i++) for(let j=0;j<this.N;j++) rho[i][j] = 1 - this.phiMag[i][j];
+          } else {
+            // ρ = ½|∇θ|² with wrapped angular diffs
+            for(let i=0;i<this.N;i++){
+              for(let j=0;j<this.N;j++){
+                const th_xp = this.theta[i][mod(j+1,this.N)], th_xm = this.theta[i][mod(j-1,this.N)];
+                const th_yp = this.theta[mod(i+1,this.N)][j], th_ym = this.theta[mod(i-1,this.N)][j];
+                const dx = angleDiff(th_xp, th_xm)/2; const dy = angleDiff(th_yp, th_ym)/2;
+                rho[i][j] = 0.5*(dx*dx + dy*dy);
+              }
+            }
+          }
+          this.potential = this.solvePoissonJacobi(rho, this.iters, 0.9);
+        }
+      }
+
+      computeCurvaturePotential(){
+        const N=this.N; const out=this.potential; const C=this.phiMag;
+        for(let i=0;i<N;i++){
+          for(let j=0;j<N;j++){
+            const im=mod(i-1,N), ip=mod(i+1,N), jm=mod(j-1,N), jp=mod(j+1,N);
+            const lap = (C[im][j] + C[ip][j] + C[i][jm] + C[i][jp] - 4*C[i][j]);
+            out[i][j] = -lap; // curvature-derived potential
+          }
+        }
+      }
+
+      solvePoissonJacobi(rho, iters=300, omega=0.9){
+        const N=this.N; const phi=this.alloc(N); const next=this.alloc(N);
+        for(let it=0; it<iters; it++){
+          for(let i=0;i<N;i++){
+            const im=mod(i-1,N), ip=mod(i+1,N);
+            for(let j=0;j<N;j++){
+              const jm=mod(j-1,N), jp=mod(j+1,N);
+              const avg = 0.25*(phi[im][j] + phi[ip][j] + phi[i][jm] + phi[i][jp] + rho[i][j]);
+              next[i][j] = (1-omega)*phi[i][j] + omega*avg;
+            }
+          }
+          // swap
+          const tmp = phi; for(let r=0;r<N;r++) phi[r]=next[r], next[r]=tmp[r];
+        }
+        return phi;
+      }
+
+      updateStats(){
+        const N=this.N; let sumC=0, hi=0; let maxAbs=0;
+        for(let i=0;i<N;i++) for(let j=0;j<N;j++){
+          sumC += this.phiMag[i][j];
+          if(this.phiMag[i][j]>0.8) hi++;
+          const v = this.potential[i][j]; if(Math.abs(v)>maxAbs) maxAbs=Math.abs(v);
+        }
+        const wells = this.countLocalMinima(this.potential);
+        document.getElementById('avgC').textContent = (sumC/(N*N)).toFixed(3);
+        document.getElementById('hiFrac').textContent = ((100*hi/(N*N)).toFixed(1)+"%");
+        document.getElementById('maxP').textContent = maxAbs.toFixed(3);
+        document.getElementById('wells').textContent = wells.toString();
+      }
+
+      countLocalMinima(grid){
+        const N=this.N; let c=0;
+        for(let i=0;i<N;i++) for(let j=0;j<N;j++){
+          const v = grid[i][j]; let isMin=true;
+          for(let dy=-1; dy<=1 && isMin; dy++) for(let dx=-1; dx<=1 && isMin; dx++){
+            if(dx===0 && dy===0) continue;
+            if(grid[mod(i+dy,N)][mod(j+dx,N)] <= v) isMin=false;
+          }
+          if(isMin) c++;
+        }
+        return c;
+      }
+
+      renderAll(){ this.renderPhase(); this.renderCoherence(); this.renderPotential(); }
+
+      renderPhase(){
+        const N=this.N, ctx=this.phaseCtx; const img = ctx.createImageData(N,N);
+        let p=0; for(let i=0;i<N;i++) for(let j=0;j<N;j++){
+          const th = this.theta[i][j];
+          const hue = ((th + Math.PI)/(2*Math.PI))*360; // 0..360
+          const [r,g,b] = this.hsv2rgb(hue,1,1);
+          img.data[p++] = r; img.data[p++] = g; img.data[p++] = b; img.data[p++] = 255;
+        }
+        ctx.putImageData(img,0,0);
+      }
+
+      renderCoherence(){
+        const N=this.N, ctx=this.cohCtx; const img = ctx.createImageData(N,N);
+        let p=0; for(let i=0;i<N;i++) for(let j=0;j<N;j++){
+          const v = Math.max(0, Math.min(1, this.phiMag[i][j])); const c = (v*255)|0;
+          img.data[p++] = c; img.data[p++] = c; img.data[p++] = c; img.data[p++] = 255;
+        }
+        ctx.putImageData(img,0,0);
+      }
+
+      renderPotential(){
+        const N=this.N, ctx=this.potCtx; const img = ctx.createImageData(N,N);
+        // compute symmetric range
+        let min=Infinity, max=-Infinity; for(let i=0;i<N;i++) for(let j=0;j<N;j++){ const v=this.potential[i][j]; if(v<min) min=v; if(v>max) max=v; }
+        const scale = Math.max(Math.abs(min), Math.abs(max)) || 1;
+        let p=0; for(let i=0;i<N;i++) for(let j=0;j<N;j++){
+          const v = this.potential[i][j]/scale; // -1..1
+          let r=0,g=0,b=0;
+          if(v>=0){ r = Math.floor(255*v); } else { b = Math.floor(255*(-v)); }
+          img.data[p++] = r; img.data[p++] = g; img.data[p++] = b; img.data[p++] = 255;
+        }
+        ctx.putImageData(img,0,0);
+      }
+
+      hsv2rgb(h,s,v){
+        const c=v*s, m=v-c; const hp=(h/60)%6; const x=c*(1-Math.abs(hp%2-1));
+        let r=0,g=0,b=0; if(0<=hp&&hp<1){r=c;g=x}else if(1<=hp&&hp<2){r=x;g=c}
+        else if(2<=hp&&hp<3){g=c;b=x}else if(3<=hp&&hp<4){g=x;b=c}
+        else if(4<=hp&&hp<5){r=x;b=c}else {r=c;b=x}
+        return [Math.round(255*(r+m)),Math.round(255*(g+m)),Math.round(255*(b+m))];
+      }
+    }
+
+    // Boot
+    window.addEventListener('load', ()=>{
+      const app = new CoherenceCurvatureViz();
+      window._coherenceCurvatureApp = app; // for console poking
+    });
+  </script>
+</body>
+</html>
