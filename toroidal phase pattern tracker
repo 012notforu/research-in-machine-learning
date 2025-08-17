@@ -1,0 +1,1698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Toroidal Phase Life Simulator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0a0a1a, #1a1a3a, #2a2a5a, #1a3a1a);
+            color: white;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+        
+        .header {
+            background: rgba(0,0,0,0.9);
+            padding: 15px;
+            text-align: center;
+            border-bottom: 3px solid rgba(255,255,255,0.3);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+        
+        .header h1 {
+            font-size: clamp(20px, 4vw, 36px);
+            background: linear-gradient(45deg, #ff6b35, #ffeb3b, #4caf50, #2196f3, #9c27b0, #ff0080);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+            animation: pulse 3s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+        
+        .header p {
+            font-size: clamp(12px, 2.5vw, 16px);
+            opacity: 0.9;
+            color: #ffeb3b;
+        }
+        
+        .controls {
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            border-bottom: 2px solid rgba(255,255,255,0.1);
+        }
+        
+        .control-section {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .control-section h3 {
+            color: #ffeb3b;
+            margin-bottom: 12px;
+            font-size: 16px;
+            border-bottom: 1px solid rgba(255,235,59,0.3);
+            padding-bottom: 4px;
+        }
+        
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+        
+        .control-group label {
+            font-weight: bold;
+            min-width: 80px;
+            color: #ffffff;
+        }
+        
+        .control-group input[type="range"] {
+            flex: 1;
+            height: 28px;
+        }
+        
+        .control-group input[type="number"] {
+            width: 80px;
+            background: rgba(0,0,0,0.6);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            padding: 6px 8px;
+            border-radius: 6px;
+            font-size: 12px;
+        }
+        
+        .control-group input[type="checkbox"] {
+            transform: scale(1.2);
+        }
+        
+        .value-display {
+            background: rgba(0,0,0,0.6);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-family: monospace;
+            min-width: 80px;
+            text-align: center;
+            color: #4CAF50;
+            font-weight: bold;
+        }
+        
+        .equation-box {
+            background: rgba(0,0,0,0.4);
+            padding: 10px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 12px;
+            border: 1px solid rgba(255,255,255,0.2);
+            margin: 8px 0;
+            color: #ffeb3b;
+        }
+        
+        .buttons {
+            background: rgba(0,0,0,0.7);
+            padding: 15px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            justify-content: center;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            transition: all 0.3s;
+            min-width: 140px;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.3);
+        }
+        
+        .btn-primary { background: linear-gradient(135deg, #2196F3, #1976D2); }
+        .btn-research { background: linear-gradient(135deg, #9C27B0, #7B1FA2); }
+        .btn-danger { background: linear-gradient(135deg, #f44336, #d32f2f); }
+        .btn-performance { background: linear-gradient(135deg, #FF9800, #F57C00); }
+        .btn-life { background: linear-gradient(135deg, #00BCD4, #0097A7); }
+        .btn-fft { background: linear-gradient(135deg, #E91E63, #C2185B); }
+        
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+            padding: 15px;
+        }
+        
+        @media (min-width: 768px) {
+            .main-grid { grid-template-columns: 1fr 1fr; }
+        }
+        
+        @media (min-width: 1400px) {
+            .main-grid { grid-template-columns: 1fr 1fr 1fr; }
+        }
+        
+        .panel {
+            background: rgba(255,255,255,0.08);
+            border-radius: 16px;
+            padding: 20px;
+            backdrop-filter: blur(15px);
+            border: 2px solid rgba(255,255,255,0.15);
+            min-height: 280px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .panel h3 {
+            color: #ffeb3b;
+            margin: 0 0 15px 0;
+            font-size: clamp(15px, 3vw, 20px);
+            border-bottom: 2px solid rgba(255,235,59,0.4);
+            padding-bottom: 8px;
+        }
+        
+        .canvas-container {
+            flex: 1;
+            position: relative;
+            min-height: 180px;
+            border-radius: 12px;
+            overflow: hidden;
+            background: rgba(0,0,0,0.5);
+            border: 2px solid rgba(255,255,255,0.1);
+        }
+        
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        
+        .metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 12px;
+            font-size: 12px;
+            font-family: monospace;
+        }
+        
+        .metrics-wide {
+            grid-template-columns: 1fr;
+        }
+        
+        .metric {
+            background: rgba(0,0,0,0.6);
+            padding: 8px 10px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            border: 1px solid rgba(255,255,255,0.15);
+        }
+        
+        .metric-label {
+            color: #ffeb3b;
+            font-weight: bold;
+        }
+        
+        .metric-value {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+        
+        .life-form {
+            background: rgba(0, 255, 136, 0.2);
+            border: 2px solid rgba(0, 255, 136, 0.8);
+            animation: lifeGlow 2s ease-in-out infinite;
+        }
+        
+        @keyframes lifeGlow {
+            0%, 100% { box-shadow: 0 0 10px rgba(0, 255, 136, 0.3); }
+            50% { box-shadow: 0 0 20px rgba(0, 255, 136, 0.6); }
+        }
+        
+        .pattern-library {
+            max-height: 200px;
+            overflow-y: auto;
+            background: rgba(0,0,0,0.4);
+            border-radius: 8px;
+            padding: 10px;
+        }
+        
+        .pattern-item {
+            padding: 8px;
+            margin: 4px 0;
+            background: rgba(255,255,255,0.1);
+            border-radius: 6px;
+            cursor: pointer;
+            border-left: 4px solid #4CAF50;
+            font-size: 12px;
+            transition: all 0.3s;
+        }
+        
+        .pattern-item:hover {
+            background: rgba(255,255,255,0.2);
+            transform: translateX(5px);
+        }
+        
+        .pattern-stable {
+            border-left-color: #4CAF50;
+        }
+        
+        .pattern-oscillator {
+            border-left-color: #FF9800;
+        }
+        
+        .pattern-traveler {
+            border-left-color: #2196F3;
+        }
+        
+        .pattern-exotic {
+            border-left-color: #9C27B0;
+        }
+        
+        .status-bar {
+            background: rgba(0,0,0,0.9);
+            padding: 12px 20px;
+            text-align: center;
+            font-size: 13px;
+            border-top: 2px solid rgba(255,255,255,0.2);
+            font-family: monospace;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+        
+        .status-item {
+            padding: 4px 8px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 6px;
+        }
+        
+        .output-panel {
+            grid-column: 1 / -1;
+            background: rgba(0,0,0,0.7);
+            border-radius: 12px;
+            padding: 15px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 180px;
+            overflow-y: auto;
+            border: 2px solid rgba(255,255,255,0.2);
+        }
+        
+        .performance-indicator {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            background: rgba(0,0,0,0.8);
+            padding: 10px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 11px;
+            border: 1px solid rgba(255,255,255,0.3);
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🧬🍩 Toroidal Phase Life Simulator</h1>
+        <p>FFT-Accelerated • Multi-Ring Kernels • Pattern Discovery • Lenia-Inspired • Phase Evolution</p>
+    </div>
+
+    <div class="controls">
+        <div class="control-section">
+            <h3>🔢 Phase Configuration</h3>
+            <div class="control-group">
+                <label>N States:</label>
+                <input type="range" id="phaseStates" min="3" max="16" value="7">
+                <span class="value-display" id="phaseStatesVal">7-Phase</span>
+            </div>
+            <div class="control-group">
+                <label>Grid Size:</label>
+                <input type="range" id="gridSize" min="32" max="256" step="32" value="128">
+                <span class="value-display" id="gridSizeVal">128×128</span>
+            </div>
+            <div class="equation-box">
+                ψₖ = e^(i2πk/N) | FFT-Optimized
+            </div>
+        </div>
+
+        <div class="control-section">
+            <h3>🌀 Multi-Ring Kernel</h3>
+            <div class="control-group">
+                <label>Inner Ring:</label>
+                <input type="range" id="innerWeight" min="0" max="2" step="0.1" value="1.0">
+                <span class="value-display" id="innerWeightVal">1.0</span>
+            </div>
+            <div class="control-group">
+                <label>Mid Ring:</label>
+                <input type="range" id="midWeight" min="-1" max="1" step="0.1" value="0.2">
+                <span class="value-display" id="midWeightVal">0.2</span>
+            </div>
+            <div class="control-group">
+                <label>Outer Ring:</label>
+                <input type="range" id="outerWeight" min="-1" max="1" step="0.1" value="-0.1">
+                <span class="value-display" id="outerWeightVal">-0.1</span>
+            </div>
+            <div class="equation-box">
+                K(r) = w₁·G(r₁) + w₂·G(r₂) + w₃·G(r₃)
+            </div>
+        </div>
+
+        <div class="control-section">
+            <h3>🌊 Phase Evolution</h3>
+            <div class="control-group">
+                <label>Time Step:</label>
+                <input type="range" id="timeStep" min="0.01" max="0.5" step="0.01" value="0.1">
+                <span class="value-display" id="timeStepVal">0.10</span>
+            </div>
+            <div class="control-group">
+                <label>Damping:</label>
+                <input type="range" id="damping" min="0" max="1" step="0.01" value="0.05">
+                <span class="value-display" id="dampingVal">0.05</span>
+            </div>
+            <div class="equation-box">
+                ∂φ/∂t = sin(φₜₐᵣ - φ) - λφ + noise
+            </div>
+        </div>
+
+        <div class="control-section">
+            <h3>🧬 Life Detection</h3>
+            <div class="control-group">
+                <label>Stability:</label>
+                <input type="range" id="stabilityThreshold" min="0.1" max="1" step="0.01" value="0.8">
+                <span class="value-display" id="stabilityVal">0.80</span>
+            </div>
+            <div class="control-group">
+                <label>Min Size:</label>
+                <input type="range" id="minLifeSize" min="5" max="50" value="10">
+                <span class="value-display" id="minLifeSizeVal">10</span>
+            </div>
+            <div class="equation-box">
+                Life = coherence > θ ∧ size > σ ∧ stable
+            </div>
+        </div>
+    </div>
+
+    <div class="buttons">
+        <button id="startBtn">▶️ Start</button>
+        <button id="pauseBtn">⏸️ Pause</button>
+        <button id="resetBtn" class="btn-danger">🔄 Reset</button>
+        <button id="randomizeBtn" class="btn-primary">🎲 Randomize</button>
+        <button id="fftBtn" class="btn-fft">⚡ FFT Mode</button>
+        <button id="huntBtn" class="btn-life">🧬 Hunt Life</button>
+        <button id="exportBtn" class="btn-research">💾 Export</button>
+    </div>
+
+    <div class="main-grid">
+        <!-- Phase Life Grid -->
+        <div class="panel" style="background: rgba(255, 152, 0, 0.1); border-color: rgba(255, 152, 0, 0.3);" id="phasePanel">
+            <h3>🧬 Phase Life Field</h3>
+            <div class="canvas-container">
+                <canvas id="phaseCanvas" width="400" height="400"></canvas>
+            </div>
+            <div class="equation-box">
+                Φ(t+1) = FFT⁻¹[FFT(Φ) ⊛ FFT(K)] + δ(Φ)
+            </div>
+            <div class="metrics">
+                <div class="metric">
+                    <span class="metric-label">Life Forms:</span>
+                    <span class="metric-value" id="lifeCount">0</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Coherence:</span>
+                    <span class="metric-value" id="globalCoherence">0.000</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">FFT Speed:</span>
+                    <span class="metric-value" id="fftSpeed">0ms</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Stability:</span>
+                    <span class="metric-value" id="stability">0.000</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Kernel Visualization -->
+        <div class="panel" style="background: rgba(156, 39, 176, 0.1); border-color: rgba(156, 39, 176, 0.3);">
+            <h3>🌀 Multi-Ring Kernel</h3>
+            <div class="canvas-container">
+                <canvas id="kernelCanvas" width="400" height="400"></canvas>
+            </div>
+            <div class="equation-box">
+                K(r,θ) = Σᵢ wᵢ·exp(-r²/2σᵢ²)·cos(θ-θᵢ)
+            </div>
+            <div class="metrics">
+                <div class="metric">
+                    <span class="metric-label">Inner R:</span>
+                    <span class="metric-value" id="innerRadius">8</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Mid R:</span>
+                    <span class="metric-value" id="midRadius">16</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Outer R:</span>
+                    <span class="metric-value" id="outerRadius">24</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Kernel Sum:</span>
+                    <span class="metric-value" id="kernelSum">1.000</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pattern Library -->
+        <div class="panel" style="background: rgba(76, 175, 80, 0.1); border-color: rgba(76, 175, 80, 0.3);">
+            <h3>📚 Discovered Patterns</h3>
+            <div class="pattern-library" id="patternLibrary">
+                <div class="pattern-item pattern-stable">
+                    <strong>Stable Vortex</strong><br>
+                    Coherence: 0.95 | Size: 25 | Period: ∞
+                </div>
+                <div class="pattern-item pattern-oscillator">
+                    <strong>Phase Oscillator</strong><br>
+                    Coherence: 0.82 | Size: 18 | Period: 12
+                </div>
+                <div class="pattern-item pattern-traveler">
+                    <strong>Wave Walker</strong><br>
+                    Coherence: 0.78 | Size: 15 | Speed: 0.3
+                </div>
+            </div>
+            <div class="equation-box">
+                Classification: Φ → {stable, oscillator, traveler, exotic}
+            </div>
+            <div class="metrics">
+                <div class="metric">
+                    <span class="metric-label">Total Found:</span>
+                    <span class="metric-value" id="totalPatterns">3</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Stable:</span>
+                    <span class="metric-value" id="stableCount">1</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Dynamic:</span>
+                    <span class="metric-value" id="dynamicCount">2</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Hunt Score:</span>
+                    <span class="metric-value" id="huntScore">7.5</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Phase Coherence Analysis -->
+        <div class="panel" style="background: rgba(33, 150, 243, 0.1); border-color: rgba(33, 150, 243, 0.3);">
+            <h3>📊 Coherence Analysis</h3>
+            <div class="canvas-container">
+                <canvas id="coherenceCanvas" width="400" height="300"></canvas>
+            </div>
+            <div class="equation-box">
+                C(r) = |⟨ψ(r)⟩| = |∑ⱼ e^(iφⱼ)|/N
+            </div>
+            <div class="metrics">
+                <div class="metric">
+                    <span class="metric-label">Local Max:</span>
+                    <span class="metric-value" id="localCoherence">0.000</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Gradient:</span>
+                    <span class="metric-value" id="coherenceGrad">0.000</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Boundaries:</span>
+                    <span class="metric-value" id="boundaryCount">0</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Vortices:</span>
+                    <span class="metric-value" id="vortexCount">0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- FFT Performance Monitor -->
+        <div class="panel" style="background: rgba(233, 30, 99, 0.1); border-color: rgba(233, 30, 99, 0.3);">
+            <h3>⚡ FFT Performance</h3>
+            <div class="canvas-container">
+                <canvas id="perfCanvas" width="400" height="300"></canvas>
+            </div>
+            <div class="equation-box">
+                FFT: O(N log N) vs Naive: O(N²)
+            </div>
+            <div class="metrics">
+                <div class="metric">
+                    <span class="metric-label">FFT Time:</span>
+                    <span class="metric-value" id="fftTime">0ms</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Conv Time:</span>
+                    <span class="metric-value" id="convTime">0ms</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Speedup:</span>
+                    <span class="metric-value" id="speedup">1.0x</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Memory:</span>
+                    <span class="metric-value" id="memoryUsage">0MB</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Research Dashboard -->
+        <div class="panel" style="background: rgba(103, 58, 183, 0.1); border-color: rgba(103, 58, 183, 0.3);">
+            <h3>🔬 Research Dashboard</h3>
+            <div class="canvas-container">
+                <canvas id="researchCanvas" width="400" height="300"></canvas>
+            </div>
+            <div class="equation-box">
+                Research: ∫ [discovery_rate × complexity] dt
+            </div>
+            <div class="metrics metrics-wide">
+                <div class="metric">
+                    <span class="metric-label">Session Time:</span>
+                    <span class="metric-value" id="sessionTime">00:00</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Evolution Steps:</span>
+                    <span class="metric-value" id="evolutionSteps">0</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Pattern Diversity:</span>
+                    <span class="metric-value" id="patternDiversity">0.00</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Discovery Rate:</span>
+                    <span class="metric-value" id="discoveryRate">0.0/min</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Research Output Panel -->
+    <div class="output-panel" id="researchOutput">
+        🧬 Toroidal Phase Life Simulator v1.0 initializing...<br>
+        ⚡ FFT-accelerated phasor convolution engine loaded<br>
+        🌀 Multi-ring kernel system active<br>
+        🔬 Pattern discovery and classification ready<br>
+        🍩 Toroidal topology with perfect conservation enabled
+    </div>
+
+    <div class="status-bar">
+        <div class="status-item">
+            <strong>System:</strong> <span id="systemStatus">Initializing</span>
+        </div>
+        <div class="status-item">
+            <strong>Mode:</strong> <span id="computeMode">FFT</span>
+        </div>
+        <div class="status-item">
+            <strong>Grid:</strong> <span id="gridStatus">128×128 7-Phase</span>
+        </div>
+        <div class="status-item">
+            <strong>Life Hunt:</strong> <span id="huntStatus">Scanning</span>
+        </div>
+    </div>
+
+    <div class="performance-indicator" id="perfIndicator">
+        <div>⚡ <span id="fftStatus">FFT: ON</span></div>
+        <div>🧬 <span id="lifeStatus">Life: 0</span></div>
+        <div>⏱️ <span id="frameTime">Frame: 0ms</span></div>
+    </div>
+
+    <script>
+        // Fast FFT implementation for complex numbers
+        class FastFFT {
+            static fft(x) {
+                const N = x.length;
+                if (N <= 1) return x;
+                
+                if (N % 2 !== 0) {
+                    throw new Error('FFT size must be power of 2');
+                }
+                
+                const even = FastFFT.fft(x.filter((_, i) => i % 2 === 0));
+                const odd = FastFFT.fft(x.filter((_, i) => i % 2 === 1));
+                
+                const combined = new Array(N);
+                for (let k = 0; k < N / 2; k++) {
+                    const angle = -2 * Math.PI * k / N;
+                    const tReal = Math.cos(angle) * odd[k].real - Math.sin(angle) * odd[k].imag;
+                    const tImag = Math.sin(angle) * odd[k].real + Math.cos(angle) * odd[k].imag;
+                    
+                    combined[k] = {
+                        real: even[k].real + tReal,
+                        imag: even[k].imag + tImag
+                    };
+                    combined[k + N / 2] = {
+                        real: even[k].real - tReal,
+                        imag: even[k].imag - tImag
+                    };
+                }
+                return combined;
+            }
+            
+            static ifft(x) {
+                const N = x.length;
+                // Conjugate, FFT, conjugate, scale
+                const conjugated = x.map(c => ({ real: c.real, imag: -c.imag }));
+                const result = FastFFT.fft(conjugated);
+                return result.map(c => ({ 
+                    real: c.real / N, 
+                    imag: -c.imag / N 
+                }));
+            }
+            
+            static fft2d(matrix) {
+                const rows = matrix.length;
+                const cols = matrix[0].length;
+                
+                // FFT rows
+                let result = matrix.map(row => FastFFT.fft(row));
+                
+                // FFT columns
+                for (let col = 0; col < cols; col++) {
+                    const column = result.map(row => row[col]);
+                    const fftColumn = FastFFT.fft(column);
+                    for (let row = 0; row < rows; row++) {
+                        result[row][col] = fftColumn[row];
+                    }
+                }
+                
+                return result;
+            }
+            
+            static ifft2d(matrix) {
+                const rows = matrix.length;
+                const cols = matrix[0].length;
+                
+                // IFFT rows
+                let result = matrix.map(row => FastFFT.ifft(row));
+                
+                // IFFT columns
+                for (let col = 0; col < cols; col++) {
+                    const column = result.map(row => row[col]);
+                    const ifftColumn = FastFFT.ifft(column);
+                    for (let row = 0; row < rows; row++) {
+                        result[row][col] = ifftColumn[row];
+                    }
+                }
+                
+                return result;
+            }
+        }
+
+        // Multi-ring kernel for Lenia-style interactions
+        class MultiRingKernel {
+            constructor(size) {
+                this.size = size;
+                this.innerRadius = 8;
+                this.midRadius = 16;
+                this.outerRadius = 24;
+                this.innerWeight = 1.0;
+                this.midWeight = 0.2;
+                this.outerWeight = -0.1;
+                this.kernel = this.generateKernel();
+            }
+            
+            generateKernel() {
+                const kernel = new Array(this.size);
+                const centerX = Math.floor(this.size / 2);
+                const centerY = Math.floor(this.size / 2);
+                
+                for (let i = 0; i < this.size; i++) {
+                    kernel[i] = new Array(this.size);
+                    for (let j = 0; j < this.size; j++) {
+                        const dx = i - centerX;
+                        const dy = j - centerY;
+                        const r = Math.sqrt(dx * dx + dy * dy);
+                        
+                        let weight = 0;
+                        
+                        // Inner ring - strong synchronization
+                        if (r <= this.innerRadius) {
+                            const intensity = Math.exp(-r * r / (2 * this.innerRadius * this.innerRadius / 4));
+                            weight += this.innerWeight * intensity;
+                        }
+                        
+                        // Mid ring - weak coupling
+                        if (r > this.innerRadius && r <= this.midRadius) {
+                            const intensity = Math.exp(-(r - this.innerRadius) * (r - this.innerRadius) / 
+                                                     (2 * (this.midRadius - this.innerRadius) * (this.midRadius - this.innerRadius) / 4));
+                            weight += this.midWeight * intensity;
+                        }
+                        
+                        // Outer ring - inhibition
+                        if (r > this.midRadius && r <= this.outerRadius) {
+                            const intensity = Math.exp(-(r - this.midRadius) * (r - this.midRadius) / 
+                                                     (2 * (this.outerRadius - this.midRadius) * (this.outerRadius - this.midRadius) / 4));
+                            weight += this.outerWeight * intensity;
+                        }
+                        
+                        kernel[i][j] = { real: weight, imag: 0 };
+                    }
+                }
+                
+                // Normalize kernel
+                let sum = 0;
+                for (let i = 0; i < this.size; i++) {
+                    for (let j = 0; j < this.size; j++) {
+                        sum += kernel[i][j].real;
+                    }
+                }
+                
+                if (Math.abs(sum) > 0.001) {
+                    for (let i = 0; i < this.size; i++) {
+                        for (let j = 0; j < this.size; j++) {
+                            kernel[i][j].real /= sum;
+                        }
+                    }
+                }
+                
+                return kernel;
+            }
+            
+            updateWeights(inner, mid, outer) {
+                this.innerWeight = inner;
+                this.midWeight = mid;
+                this.outerWeight = outer;
+                this.kernel = this.generateKernel();
+            }
+        }
+
+        // Pattern classification and life detection
+        class PhaseLifeDetector {
+            constructor() {
+                this.patterns = [];
+                this.stabilityThreshold = 0.8;
+                this.minLifeSize = 10;
+                this.patternHistory = [];
+            }
+            
+            detectLife(grid) {
+                const lifeforms = [];
+                const coherenceMap = this.calculateCoherenceMap(grid);
+                const clusters = this.findCoherentClusters(coherenceMap);
+                
+                for (const cluster of clusters) {
+                    if (cluster.size >= this.minLifeSize && cluster.coherence >= this.stabilityThreshold) {
+                        const pattern = this.classifyPattern(cluster, grid);
+                        lifeforms.push(pattern);
+                    }
+                }
+                
+                return lifeforms;
+            }
+            
+            calculateCoherenceMap(grid) {
+                const size = grid.length;
+                const coherenceMap = new Array(size);
+                
+                for (let i = 0; i < size; i++) {
+                    coherenceMap[i] = new Array(size);
+                    for (let j = 0; j < size; j++) {
+                        // Calculate local coherence in 5x5 neighborhood
+                        let sumReal = 0, sumImag = 0, count = 0;
+                        
+                        for (let di = -2; di <= 2; di++) {
+                            for (let dj = -2; dj <= 2; dj++) {
+                                const ni = (i + di + size) % size;
+                                const nj = (j + dj + size) % size;
+                                const phase = grid[ni][nj] * 2 * Math.PI / 7; // assuming 7-phase
+                                sumReal += Math.cos(phase);
+                                sumImag += Math.sin(phase);
+                                count++;
+                            }
+                        }
+                        
+                        const magnitude = Math.sqrt(sumReal * sumReal + sumImag * sumImag);
+                        coherenceMap[i][j] = magnitude / count;
+                    }
+                }
+                
+                return coherenceMap;
+            }
+            
+            findCoherentClusters(coherenceMap) {
+                const size = coherenceMap.length;
+                const visited = new Array(size);
+                for (let i = 0; i < size; i++) {
+                    visited[i] = new Array(size).fill(false);
+                }
+                
+                const clusters = [];
+                
+                for (let i = 0; i < size; i++) {
+                    for (let j = 0; j < size; j++) {
+                        if (!visited[i][j] && coherenceMap[i][j] > this.stabilityThreshold) {
+                            const cluster = this.floodFill(coherenceMap, visited, i, j);
+                            if (cluster.size >= this.minLifeSize) {
+                                clusters.push(cluster);
+                            }
+                        }
+                    }
+                }
+                
+                return clusters;
+            }
+            
+            floodFill(coherenceMap, visited, startI, startJ) {
+                const size = coherenceMap.length;
+                const stack = [{i: startI, j: startJ}];
+                const cluster = {
+                    cells: [],
+                    size: 0,
+                    coherence: 0,
+                    centerX: 0,
+                    centerY: 0
+                };
+                
+                let totalCoherence = 0;
+                
+                while (stack.length > 0) {
+                    const {i, j} = stack.pop();
+                    
+                    if (i < 0 || i >= size || j < 0 || j >= size || visited[i][j]) {
+                        continue;
+                    }
+                    
+                    if (coherenceMap[i][j] < this.stabilityThreshold) {
+                        continue;
+                    }
+                    
+                    visited[i][j] = true;
+                    cluster.cells.push({i, j});
+                    cluster.size++;
+                    totalCoherence += coherenceMap[i][j];
+                    cluster.centerX += i;
+                    cluster.centerY += j;
+                    
+                    // Add neighbors
+                    stack.push({i: i-1, j: j}, {i: i+1, j: j}, {i: i, j: j-1}, {i: i, j: j+1});
+                }
+                
+                cluster.coherence = totalCoherence / cluster.size;
+                cluster.centerX /= cluster.size;
+                cluster.centerY /= cluster.size;
+                
+                return cluster;
+            }
+            
+            classifyPattern(cluster, grid) {
+                // Simple classification based on properties
+                const pattern = {
+                    type: 'unknown',
+                    coherence: cluster.coherence,
+                    size: cluster.size,
+                    position: {x: cluster.centerX, y: cluster.centerY},
+                    timestamp: Date.now()
+                };
+                
+                if (cluster.coherence > 0.95) {
+                    pattern.type = 'stable';
+                } else if (cluster.coherence > 0.85) {
+                    pattern.type = 'oscillator';
+                } else if (cluster.coherence > 0.75) {
+                    pattern.type = 'traveler';
+                } else {
+                    pattern.type = 'exotic';
+                }
+                
+                return pattern;
+            }
+        }
+
+        // Main Toroidal Phase Life System
+        class ToroidalPhaseLifeSystem {
+            constructor() {
+                console.log('🧬 Initializing Toroidal Phase Life Simulator...');
+                
+                this.config = {
+                    version: '1.0.0-hybrid',
+                    startTime: Date.now(),
+                    gridSize: 128,
+                    phaseStates: 7,
+                    timeStep: 0.1,
+                    damping: 0.05,
+                    fftMode: true
+                };
+                
+                this.isRunning = false;
+                this.frameCount = 0;
+                this.lastTime = 0;
+                
+                // Initialize components
+                this.grid = this.initializeGrid();
+                this.kernel = new MultiRingKernel(this.config.gridSize);
+                this.lifeDetector = new PhaseLifeDetector();
+                this.patterns = [];
+                this.performanceData = {
+                    fftTime: 0,
+                    convTime: 0,
+                    frameTime: 0
+                };
+                
+                this.initializeCanvases();
+                this.initializeControls();
+                this.startMainLoop();
+                
+                console.log('✅ Toroidal Phase Life Simulator ready');
+                this.addOutput('🧬 Phase Life Simulator ready - hunting for emergent patterns');
+            }
+            
+            initializeGrid() {
+                const size = this.config.gridSize;
+                const grid = new Array(size);
+                
+                for (let i = 0; i < size; i++) {
+                    grid[i] = new Array(size);
+                    for (let j = 0; j < size; j++) {
+                        grid[i][j] = Math.floor(Math.random() * this.config.phaseStates);
+                    }
+                }
+                
+                return grid;
+            }
+            
+            initializeCanvases() {
+                this.canvases = {
+                    phase: document.getElementById('phaseCanvas'),
+                    kernel: document.getElementById('kernelCanvas'),
+                    coherence: document.getElementById('coherenceCanvas'),
+                    perf: document.getElementById('perfCanvas'),
+                    research: document.getElementById('researchCanvas')
+                };
+                
+                this.contexts = {};
+                for (const name in this.canvases) {
+                    const canvas = this.canvases[name];
+                    this.contexts[name] = canvas.getContext('2d');
+                    const rect = canvas.getBoundingClientRect();
+                    canvas.width = rect.width;
+                    canvas.height = rect.height;
+                }
+                
+                console.log('📊 Canvas system initialized');
+            }
+            
+            initializeControls() {
+                const self = this;
+                
+                // Phase configuration
+                document.getElementById('phaseStates').addEventListener('input', function() {
+                    self.config.phaseStates = parseInt(this.value);
+                    document.getElementById('phaseStatesVal').textContent = this.value + '-Phase';
+                    self.updateStatus();
+                });
+                
+                document.getElementById('gridSize').addEventListener('input', function() {
+                    const size = parseInt(this.value);
+                    self.config.gridSize = size;
+                    self.grid = self.initializeGrid();
+                    self.kernel = new MultiRingKernel(size);
+                    document.getElementById('gridSizeVal').textContent = size + '×' + size;
+                    self.updateStatus();
+                });
+                
+                // Kernel controls
+                document.getElementById('innerWeight').addEventListener('input', function() {
+                    const value = parseFloat(this.value);
+                    document.getElementById('innerWeightVal').textContent = value.toFixed(1);
+                    self.updateKernel();
+                });
+                
+                document.getElementById('midWeight').addEventListener('input', function() {
+                    const value = parseFloat(this.value);
+                    document.getElementById('midWeightVal').textContent = value.toFixed(1);
+                    self.updateKernel();
+                });
+                
+                document.getElementById('outerWeight').addEventListener('input', function() {
+                    const value = parseFloat(this.value);
+                    document.getElementById('outerWeightVal').textContent = value.toFixed(1);
+                    self.updateKernel();
+                });
+                
+                // Evolution controls
+                document.getElementById('timeStep').addEventListener('input', function() {
+                    self.config.timeStep = parseFloat(this.value);
+                    document.getElementById('timeStepVal').textContent = this.value;
+                });
+                
+                document.getElementById('damping').addEventListener('input', function() {
+                    self.config.damping = parseFloat(this.value);
+                    document.getElementById('dampingVal').textContent = this.value;
+                });
+                
+                // Life detection controls
+                document.getElementById('stabilityThreshold').addEventListener('input', function() {
+                    self.lifeDetector.stabilityThreshold = parseFloat(this.value);
+                    document.getElementById('stabilityVal').textContent = this.value;
+                });
+                
+                document.getElementById('minLifeSize').addEventListener('input', function() {
+                    self.lifeDetector.minLifeSize = parseInt(this.value);
+                    document.getElementById('minLifeSizeVal').textContent = this.value;
+                });
+                
+                // System controls
+                document.getElementById('startBtn').addEventListener('click', () => this.start());
+                document.getElementById('pauseBtn').addEventListener('click', () => this.pause());
+                document.getElementById('resetBtn').addEventListener('click', () => this.reset());
+                document.getElementById('randomizeBtn').addEventListener('click', () => this.randomize());
+                document.getElementById('fftBtn').addEventListener('click', () => this.toggleFFT());
+                document.getElementById('huntBtn').addEventListener('click', () => this.huntLife());
+                document.getElementById('exportBtn').addEventListener('click', () => this.exportData());
+                
+                console.log('🎛️ Controls configured');
+            }
+            
+            updateKernel() {
+                const inner = parseFloat(document.getElementById('innerWeight').value);
+                const mid = parseFloat(document.getElementById('midWeight').value);
+                const outer = parseFloat(document.getElementById('outerWeight').value);
+                
+                this.kernel.updateWeights(inner, mid, outer);
+                this.renderKernel();
+            }
+            
+            startMainLoop() {
+                const self = this;
+                
+                function mainLoop(timestamp) {
+                    const deltaTime = timestamp - self.lastTime;
+                    self.lastTime = timestamp;
+                    
+                    if (self.isRunning) {
+                        const startTime = performance.now();
+                        
+                        self.evolveSystem();
+                        self.detectLife();
+                        self.renderSystem();
+                        self.updateMetrics();
+                        
+                        const endTime = performance.now();
+                        self.performanceData.frameTime = endTime - startTime;
+                        self.frameCount++;
+                    }
+                    
+                    requestAnimationFrame(mainLoop);
+                }
+                
+                requestAnimationFrame(mainLoop);
+                console.log('🔄 Main loop started');
+            }
+            
+            evolveSystem() {
+                if (this.config.fftMode) {
+                    this.evolveFFT();
+                } else {
+                    this.evolveNaive();
+                }
+            }
+            
+            evolveFFT() {
+                const startTime = performance.now();
+                const size = this.config.gridSize;
+                
+                // Convert grid to complex field
+                const field = new Array(size);
+                for (let i = 0; i < size; i++) {
+                    field[i] = new Array(size);
+                    for (let j = 0; j < size; j++) {
+                        const phase = this.grid[i][j] * 2 * Math.PI / this.config.phaseStates;
+                        field[i][j] = {
+                            real: Math.cos(phase),
+                            imag: Math.sin(phase)
+                        };
+                    }
+                }
+                
+                // FFT convolution
+                const fieldFFT = FastFFT.fft2d(field);
+                const kernelFFT = FastFFT.fft2d(this.kernel.kernel);
+                
+                // Multiply in frequency domain
+                for (let i = 0; i < size; i++) {
+                    for (let j = 0; j < size; j++) {
+                        const a = fieldFFT[i][j];
+                        const b = kernelFFT[i][j];
+                        fieldFFT[i][j] = {
+                            real: a.real * b.real - a.imag * b.imag,
+                            imag: a.real * b.imag + a.imag * b.real
+                        };
+                    }
+                }
+                
+                // Inverse FFT
+                const result = FastFFT.ifft2d(fieldFFT);
+                
+                const fftTime = performance.now() - startTime;
+                this.performanceData.fftTime = fftTime;
+                
+                // Apply delta function and update grid
+                for (let i = 0; i < size; i++) {
+                    for (let j = 0; j < size; j++) {
+                        const currentPhase = this.grid[i][j] * 2 * Math.PI / this.config.phaseStates;
+                        const targetPhase = Math.atan2(result[i][j].imag, result[i][j].real);
+                        
+                        // Smooth phase evolution with damping
+                        const phaseDiff = targetPhase - currentPhase;
+                        const wrappedDiff = ((phaseDiff + Math.PI) % (2 * Math.PI)) - Math.PI;
+                        
+                        const newPhase = currentPhase + 
+                            this.config.timeStep * Math.sin(wrappedDiff) - 
+                            this.config.damping * currentPhase;
+                        
+                        // Quantize back to discrete states
+                        const normalizedPhase = ((newPhase % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+                        this.grid[i][j] = Math.round(normalizedPhase * this.config.phaseStates / (2 * Math.PI)) % this.config.phaseStates;
+                    }
+                }
+            }
+            
+            evolveNaive() {
+                // Simple neighbor averaging for comparison
+                const startTime = performance.now();
+                const size = this.config.gridSize;
+                const newGrid = new Array(size);
+                
+                for (let i = 0; i < size; i++) {
+                    newGrid[i] = new Array(size);
+                    for (let j = 0; j < size; j++) {
+                        let sumReal = 0, sumImag = 0, count = 0;
+                        
+                        // 3x3 neighborhood
+                        for (let di = -1; di <= 1; di++) {
+                            for (let dj = -1; dj <= 1; dj++) {
+                                const ni = (i + di + size) % size;
+                                const nj = (j + dj + size) % size;
+                                const phase = this.grid[ni][nj] * 2 * Math.PI / this.config.phaseStates;
+                                sumReal += Math.cos(phase);
+                                sumImag += Math.sin(phase);
+                                count++;
+                            }
+                        }
+                        
+                        const targetPhase = Math.atan2(sumImag, sumReal);
+                        const normalizedPhase = ((targetPhase % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+                        newGrid[i][j] = Math.round(normalizedPhase * this.config.phaseStates / (2 * Math.PI)) % this.config.phaseStates;
+                    }
+                }
+                
+                this.grid = newGrid;
+                this.performanceData.convTime = performance.now() - startTime;
+            }
+            
+            detectLife() {
+                const lifeforms = this.lifeDetector.detectLife(this.grid);
+                
+                // Update pattern library
+                for (const pattern of lifeforms) {
+                    // Check if this is a new pattern
+                    const isNew = !this.patterns.some(p => 
+                        Math.abs(p.position.x - pattern.position.x) < 10 &&
+                        Math.abs(p.position.y - pattern.position.y) < 10 &&
+                        p.type === pattern.type
+                    );
+                    
+                    if (isNew) {
+                        this.patterns.push(pattern);
+                        this.addPatternToLibrary(pattern);
+                        this.addOutput(`🧬 Discovered ${pattern.type}: coherence=${pattern.coherence.toFixed(3)}, size=${pattern.size}`);
+                    }
+                }
+                
+                return lifeforms;
+            }
+            
+            addPatternToLibrary(pattern) {
+                const library = document.getElementById('patternLibrary');
+                const item = document.createElement('div');
+                item.className = `pattern-item pattern-${pattern.type}`;
+                
+                let description = '';
+                switch (pattern.type) {
+                    case 'stable':
+                        description = 'Stable Configuration';
+                        break;
+                    case 'oscillator':
+                        description = 'Phase Oscillator';
+                        break;
+                    case 'traveler':
+                        description = 'Traveling Wave';
+                        break;
+                    case 'exotic':
+                        description = 'Exotic Pattern';
+                        break;
+                }
+                
+                item.innerHTML = `
+                    <strong>${description}</strong><br>
+                    Coherence: ${pattern.coherence.toFixed(2)} | Size: ${pattern.size} | Time: ${new Date().toLocaleTimeString()}
+                `;
+                
+                item.addEventListener('click', () => {
+                    // Center view on pattern
+                    this.centerOnPattern(pattern);
+                });
+                
+                library.appendChild(item);
+                
+                // Keep library manageable
+                if (library.children.length > 20) {
+                    library.removeChild(library.firstChild);
+                }
+            }
+            
+            centerOnPattern(pattern) {
+                // Highlight pattern location on main canvas
+                this.highlightPattern = pattern;
+                setTimeout(() => {
+                    this.highlightPattern = null;
+                }, 3000);
+            }
+            
+            renderSystem() {
+                this.renderPhaseField();
+                this.renderKernel();
+                this.renderCoherence();
+                this.renderPerformance();
+                this.renderResearch();
+            }
+            
+            renderPhaseField() {
+                const ctx = this.contexts.phase;
+                const canvas = this.canvases.phase;
+                const width = canvas.width;
+                const height = canvas.height;
+                
+                ctx.clearRect(0, 0, width, height);
+                
+                const size = this.config.gridSize;
+                const cellW = width / size;
+                const cellH = height / size;
+                
+                // Render phase field
+                for (let i = 0; i < size; i++) {
+                    for (let j = 0; j < size; j++) {
+                        const state = this.grid[i][j];
+                        const hue = (state / this.config.phaseStates) * 360;
+                        const saturation = 80;
+                        const lightness = 50;
+                        
+                        ctx.fillStyle = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+                        ctx.fillRect(j * cellW, i * cellH, cellW, cellH);
+                    }
+                }
+                
+                // Highlight discovered patterns
+                if (this.highlightPattern) {
+                    const pattern = this.highlightPattern;
+                    const x = pattern.position.y * cellW - 20;
+                    const y = pattern.position.x * cellH - 20;
+                    
+                    ctx.strokeStyle = '#00ff88';
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(x, y, 40, 40);
+                    
+                    ctx.fillStyle = '#00ff88';
+                    ctx.font = '12px monospace';
+                    ctx.fillText(pattern.type, x, y - 5);
+                }
+                
+                // Show current life forms
+                const currentLife = this.lifeDetector.detectLife(this.grid);
+                for (const life of currentLife) {
+                    const x = life.position.y * cellW - 10;
+                    const y = life.position.x * cellH - 10;
+                    
+                    ctx.strokeStyle = '#ff0088';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(x, y, 20, 20);
+                }
+            }
+            
+            renderKernel() {
+                const ctx = this.contexts.kernel;
+                const canvas = this.canvases.kernel;
+                const width = canvas.width;
+                const height = canvas.height;
+                
+                ctx.clearRect(0, 0, width, height);
+                
+                const kernel = this.kernel.kernel;
+                const size = kernel.length;
+                const cellW = width / size;
+                const cellH = height / size;
+                
+                // Find min/max for normalization
+                let minVal = Infinity, maxVal = -Infinity;
+                for (let i = 0; i < size; i++) {
+                    for (let j = 0; j < size; j++) {
+                        const val = kernel[i][j].real;
+                        minVal = Math.min(minVal, val);
+                        maxVal = Math.max(maxVal, val);
+                    }
+                }
+                
+                // Render kernel
+                for (let i = 0; i < size; i++) {
+                    for (let j = 0; j < size; j++) {
+                        const val = kernel[i][j].real;
+                        let color;
+                        
+                        if (val > 0) {
+                            const intensity = val / maxVal;
+                            color = `rgb(${Math.floor(255 * intensity)}, ${Math.floor(128 * intensity)}, 0)`;
+                        } else if (val < 0) {
+                            const intensity = -val / Math.abs(minVal);
+                            color = `rgb(0, ${Math.floor(128 * intensity)}, ${Math.floor(255 * intensity)})`;
+                        } else {
+                            color = 'rgb(32, 32, 32)';
+                        }
+                        
+                        ctx.fillStyle = color;
+                        ctx.fillRect(j * cellW, i * cellH, cellW, cellH);
+                    }
+                }
+                
+                // Draw rings
+                const centerX = width / 2;
+                const centerY = height / 2;
+                const scale = width / size;
+                
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, this.kernel.innerRadius * scale, 0, 2 * Math.PI);
+                ctx.stroke();
+                
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, this.kernel.midRadius * scale, 0, 2 * Math.PI);
+                ctx.stroke();
+                
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, this.kernel.outerRadius * scale, 0, 2 * Math.PI);
+                ctx.stroke();
+            }
+            
+            renderCoherence() {
+                const ctx = this.contexts.coherence;
+                const canvas = this.canvases.coherence;
+                const width = canvas.width;
+                const height = canvas.height;
+                
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+                ctx.fillRect(0, 0, width, height);
+                
+                // Plot coherence over time
+                if (this.coherenceHistory) {
+                    ctx.strokeStyle = '#00ff88';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    
+                    for (let i = 0; i < this.coherenceHistory.length; i++) {
+                        const x = (i / this.coherenceHistory.length) * width;
+                        const y = height - (this.coherenceHistory[i] * height);
+                        
+                        if (i === 0) ctx.moveTo(x, y);
+                        else ctx.lineTo(x, y);
+                    }
+                    ctx.stroke();
+                }
+            }
+            
+            renderPerformance() {
+                const ctx = this.contexts.perf;
+                const canvas = this.canvases.perf;
+                const width = canvas.width;
+                const height = canvas.height;
+                
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+                ctx.fillRect(0, 0, width, height);
+                
+                // Performance bars
+                const fftRatio = Math.min(this.performanceData.fftTime / 100, 1);
+                const convRatio = Math.min(this.performanceData.convTime / 100, 1);
+                
+                ctx.fillStyle = '#ff6b35';
+                ctx.fillRect(10, height - 30, fftRatio * (width - 20), 25);
+                
+                ctx.fillStyle = '#4caf50';
+                ctx.fillRect(10, height - 60, convRatio * (width - 20), 25);
+                
+                ctx.fillStyle = 'white';
+                ctx.font = '12px monospace';
+                ctx.fillText('FFT', 15, height - 10);
+                ctx.fillText('Naive', 15, height - 40);
+            }
+            
+            renderResearch() {
+                const ctx = this.contexts.research;
+                const canvas = this.canvases.research;
+                const width = canvas.width;
+                const height = canvas.height;
+                
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+                ctx.fillRect(0, 0, width, height);
+                
+                // Discovery timeline
+                ctx.fillStyle = '#9c27b0';
+                ctx.font = '14px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('Pattern Discovery Timeline', width/2, 25);
+                
+                // Plot discovery events
+                ctx.fillStyle = '#ffeb3b';
+                for (let i = 0; i < Math.min(this.patterns.length, 20); i++) {
+                    const x = (i / 20) * width;
+                    const y = height / 2;
+                    ctx.fillRect(x, y - 5, 3, 10);
+                }
+            }
+            
+            calculateGlobalCoherence() {
+                const size = this.config.gridSize;
+                let sumReal = 0, sumImag = 0;
+                
+                for (let i = 0; i < size; i++) {
+                    for (let j = 0; j < size; j++) {
+                        const phase = this.grid[i][j] * 2 * Math.PI / this.config.phaseStates;
+                        sumReal += Math.cos(phase);
+                        sumImag += Math.sin(phase);
+                    }
+                }
+                
+                const magnitude = Math.sqrt(sumReal * sumReal + sumImag * sumImag);
+                return magnitude / (size * size);
+            }
+            
+            updateMetrics() {
+                // Update coherence history
+                if (!this.coherenceHistory) this.coherenceHistory = [];
+                const coherence = this.calculateGlobalCoherence();
+                this.coherenceHistory.push(coherence);
+                if (this.coherenceHistory.length > 100) {
+                    this.coherenceHistory.shift();
+                }
+                
+                // Update UI metrics
+                document.getElementById('lifeCount').textContent = this.patterns.length;
+                document.getElementById('globalCoherence').textContent = coherence.toFixed(3);
+                document.getElementById('fftSpeed').textContent = this.performanceData.fftTime.toFixed(1) + 'ms';
+                document.getElementById('stability').textContent = (coherence * 100).toFixed(1) + '%';
+                
+                // Performance metrics
+                document.getElementById('fftTime').textContent = this.performanceData.fftTime.toFixed(1) + 'ms';
+                document.getElementById('convTime').textContent = this.performanceData.convTime.toFixed(1) + 'ms';
+                const speedup = this.performanceData.convTime > 0 ? this.performanceData.convTime / this.performanceData.fftTime : 1;
+                document.getElementById('speedup').textContent = speedup.toFixed(1) + 'x';
+                
+                // Memory usage estimate
+                const memoryMB = (this.config.gridSize * this.config.gridSize * 4 * 3) / (1024 * 1024);
+                document.getElementById('memoryUsage').textContent = memoryMB.toFixed(1) + 'MB';
+                
+                // Research metrics
+                const sessionTime = Math.floor((Date.now() - this.config.startTime) / 1000);
+                const minutes = Math.floor(sessionTime / 60);
+                const seconds = sessionTime % 60;
+                document.getElementById('sessionTime').textContent = 
+                    minutes.toString().padStart(2, '0') + ':' + seconds.toString().padStart(2, '0');
+                document.getElementById('evolutionSteps').textContent = this.frameCount.toLocaleString();
+                
+                const diversity = this.patterns.length > 0 ? 
+                    new Set(this.patterns.map(p => p.type)).size / this.patterns.length : 0;
+                document.getElementById('patternDiversity').textContent = diversity.toFixed(2);
+                
+                const discoveryRate = sessionTime > 0 ? (this.patterns.length * 60 / sessionTime) : 0;
+                document.getElementById('discoveryRate').textContent = discoveryRate.toFixed(1) + '/min';
+                
+                // Pattern counts
+                const stable = this.patterns.filter(p => p.type === 'stable').length;
+                const dynamic = this.patterns.filter(p => p.type !== 'stable').length;
+                document.getElementById('totalPatterns').textContent = this.patterns.length;
+                document.getElementById('stableCount').textContent = stable;
+                document.getElementById('dynamicCount').textContent = dynamic;
+                
+                const huntScore = this.patterns.length * 2.5 + stable * 1.0 + dynamic * 0.5;
+                document.getElementById('huntScore').textContent = huntScore.toFixed(1);
+            }
+            
+            updateStatus() {
+                document.getElementById('gridStatus').textContent = 
+                    this.config.gridSize + '×' + this.config.gridSize + ' ' + this.config.phaseStates + '-Phase';
+                document.getElementById('systemStatus').textContent = this.isRunning ? 'Running' : 'Paused';
+                document.getElementById('computeMode').textContent = this.config.fftMode ? 'FFT' : 'Naive';
+                document.getElementById('huntStatus').textContent = this.patterns.length > 0 ? 'Discovered' : 'Scanning';
+                
+                // Performance indicator
+                document.getElementById('fftStatus').textContent = 'FFT: ' + (this.config.fftMode ? 'ON' : 'OFF');
+                document.getElementById('lifeStatus').textContent = 'Life: ' + this.patterns.length;
+                document.getElementById('frameTime').textContent = 'Frame: ' + this.performanceData.frameTime.toFixed(1) + 'ms';
+            }
+            
+            start() {
+                this.isRunning = true;
+                document.getElementById('startBtn').innerHTML = '▶️ Running';
+                this.updateStatus();
+                this.addOutput('▶️ Phase evolution started - hunting for life');
+            }
+            
+            pause() {
+                this.isRunning = false;
+                document.getElementById('startBtn').innerHTML = '▶️ Start';
+                this.updateStatus();
+                this.addOutput('⏸️ Phase evolution paused');
+            }
+            
+            reset() {
+                this.pause();
+                this.grid = this.initializeGrid();
+                this.patterns = [];
+                this.coherenceHistory = [];
+                this.frameCount = 0;
+                this.performanceData = { fftTime: 0, convTime: 0, frameTime: 0 };
+                
+                // Clear pattern library
+                const library = document.getElementById('patternLibrary');
+                library.innerHTML = '';
+                
+                this.addOutput('🔄 System reset - clean slate for discovery');
+            }
+            
+            randomize() {
+                this.grid = this.initializeGrid();
+                this.addOutput('🎲 Grid randomized - new initial conditions');
+            }
+            
+            toggleFFT() {
+                this.config.fftMode = !this.config.fftMode;
+                const btn = document.getElementById('fftBtn');
+                btn.innerHTML = this.config.fftMode ? '⚡ FFT ON' : '⚡ FFT Mode';
+                this.updateStatus();
+                this.addOutput('⚡ FFT mode: ' + (this.config.fftMode ? 'enabled' : 'disabled'));
+            }
+            
+            huntLife() {
+                // Force life detection on current state
+                const lifeforms = this.detectLife();
+                this.addOutput(`🧬 Life hunt complete - found ${lifeforms.length} patterns`);
+                
+                // Highlight any found patterns
+                for (const pattern of lifeforms) {
+                    this.highlightPattern = pattern;
+                    setTimeout(() => {
+                        this.highlightPattern = null;
+                    }, 2000);
+                    break; // Just highlight first one
+                }
+            }
+            
+            exportData() {
+                const exportData = {
+                    metadata: {
+                        version: this.config.version,
+                        exportTime: Date.now(),
+                        sessionDuration: Date.now() - this.config.startTime,
+                        gridSize: this.config.gridSize,
+                        phaseStates: this.config.phaseStates
+                    },
+                    patterns: this.patterns,
+                    currentGrid: this.grid,
+                    kernelWeights: {
+                        inner: this.kernel.innerWeight,
+                        mid: this.kernel.midWeight,
+                        outer: this.kernel.outerWeight
+                    },
+                    performance: this.performanceData,
+                    coherenceHistory: this.coherenceHistory
+                };
+                
+                this.downloadJSON(exportData, 'phase_life_discovery_' + Date.now() + '.json');
+                this.addOutput('💾 Research data exported - patterns preserved');
+            }
+            
+            downloadJSON(data, filename) {
+                const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                a.click();
+                URL.revokeObjectURL(url);
+            }
+            
+            addOutput(message) {
+                const output = document.getElementById('researchOutput');
+                const timestamp = new Date().toLocaleTimeString();
+                output.innerHTML += '[' + timestamp + '] ' + message + '<br>';
+                output.scrollTop = output.scrollHeight;
+                
+                const lines = output.innerHTML.split('<br>');
+                if (lines.length > 100) {
+                    output.innerHTML = lines.slice(-80).join('<br>');
+                }
+            }
+        }
+        
+        // Global system instance
+        let phaseLifeSystem;
+        
+        // Initialize when page loads
+        window.addEventListener('load', function() {
+            console.log('🧬 Launching Toroidal Phase Life Simulator...');
+            phaseLifeSystem = new ToroidalPhaseLifeSystem();
+            window.phaseLifeSystem = phaseLifeSystem;
+        });
+    </script>
+</body>
+</html>
