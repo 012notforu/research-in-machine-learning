@@ -125,6 +125,12 @@
             const rhs = -coherenceTension + params.gamma * laplacian - convective;
             newTheta[i][j] = theta[i][j] + params.dt * rhs;
             
+            // Bounds checking to prevent NaN/Inf
+            if (isNaN(newTheta[i][j]) || !isFinite(newTheta[i][j])) {
+              newTheta[i][j] = theta[i][j];
+            }
+            newTheta[i][j] = Math.max(-10, Math.min(10, newTheta[i][j]));
+            
             newGrid.prevTheta[i][j] = theta[i][j];
           }
         }

@@ -1084,13 +1084,13 @@
                 });
                 
                 // System controls
-                document.getElementById('startBtn').addEventListener('click', () => this.start());
-                document.getElementById('pauseBtn').addEventListener('click', () => this.pause());
-                document.getElementById('resetBtn').addEventListener('click', () => this.reset());
-                document.getElementById('randomizeBtn').addEventListener('click', () => this.randomize());
-                document.getElementById('fftBtn').addEventListener('click', () => this.toggleFFT());
-                document.getElementById('huntBtn').addEventListener('click', () => this.huntLife());
-                document.getElementById('exportBtn').addEventListener('click', () => this.exportData());
+                document.getElementById('startBtn').addEventListener('click', () => self.start());
+                document.getElementById('pauseBtn').addEventListener('click', () => self.pause());
+                document.getElementById('resetBtn').addEventListener('click', () => self.reset());
+                document.getElementById('randomizeBtn').addEventListener('click', () => self.randomize());
+                document.getElementById('fftBtn').addEventListener('click', () => self.toggleFFT());
+                document.getElementById('huntBtn').addEventListener('click', () => self.huntLife());
+                document.getElementById('exportBtn').addEventListener('click', () => self.exportData());
                 
                 console.log('🎛️ Controls configured');
             }

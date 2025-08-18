@@ -26,7 +26,7 @@
 
     <div class="section">
       <h2>📖 README</h2>
-      <pre># SCFD Interactive: Symbolic Coherence Field Dynamics
+      <pre id="readme-content"># SCFD Interactive: Symbolic Coherence Field Dynamics
 
 ## Overview
 This notebook implements a symbolic approach to fluid dynamics where coherence patterns emerge from phase field evolution. The system uses a modified Navier-Stokes-like equation with symbolic viscosity and coherence tension.
@@ -67,7 +67,7 @@ See requirements_scfd_interactive.txt for dependencies.</pre>
 
     <div class="section">
       <h2>📋 Requirements</h2>
-      <pre>numpy>=1.21.0
+      <pre id="requirements-content">numpy>=1.21.0
 matplotlib>=3.5.0
 scipy>=1.7.0
 ipywidgets>=7.6.0
@@ -77,19 +77,19 @@ seaborn>=0.11.0
 tqdm>=4.62.0
 numba>=0.56.0
 sympy>=1.9.0</pre>
-      <button class="download-btn" onclick="downloadFile('requirements_scfd_interactive.txt', document.querySelector('pre').textContent)">Download Requirements</button>
+      <button class="download-btn" onclick="downloadFile('requirements_scfd_interactive.txt', document.getElementById('requirements-content').textContent)">Download Requirements</button>
     </div>
 
     <div class="section">
       <h2>📓 Jupyter Notebook</h2>
-      <pre>{
+      <pre id="notebook-content">{
  "cells": [
   {
    "cell_type": "markdown",
    "metadata": {},
    "source": [
-    "# SCFD Interactive: Symbolic Coherence Field Dynamics\\n",
-    "\\n",
+    "# SCFD Interactive: Symbolic Coherence Field Dynamics",
+    "",
     "This notebook implements a symbolic approach to fluid dynamics where coherence patterns emerge from phase field evolution."
    ]
   },
@@ -99,22 +99,22 @@ sympy>=1.9.0</pre>
    "metadata": {},
    "outputs": [],
    "source": [
-    "import numpy as np\\n",
-    "import matplotlib.pyplot as plt\\n",
-    "from scipy.ndimage import convolve\\n",
-    "import ipywidgets as widgets\\n",
-    "from IPython.display import display, clear_output\\n",
-    "import plotly.graph_objects as go\\n",
-    "from plotly.subplots import make_subplots\\n",
-    "import pandas as pd\\n",
-    "import seaborn as sns\\n",
-    "from tqdm.notebook import tqdm\\n",
-    "from numba import jit\\n",
-    "import sympy as sp\\n",
-    "\\n",
-    "# Set up plotting\\n",
-    "plt.style.use('dark_background')\\n",
-    "sns.set_palette(\"husl\")\\n",
+    "import numpy as np",
+    "import matplotlib.pyplot as plt",
+    "from scipy.ndimage import convolve",
+    "import ipywidgets as widgets",
+    "from IPython.display import display, clear_output",
+    "import plotly.graph_objects as go",
+    "from plotly.subplots import make_subplots",
+    "import pandas as pd",
+    "import seaborn as sns",
+    "from tqdm.notebook import tqdm",
+    "from numba import jit",
+    "import sympy as sp",
+    "",
+    "# Set up plotting",
+    "plt.style.use('dark_background')",
+    "sns.set_palette(\"husl\")",
     "%matplotlib inline"
    ]
   },
@@ -124,31 +124,31 @@ sympy>=1.9.0</pre>
    "metadata": {},
    "outputs": [],
    "source": [
-    "@jit(nopython=True)\\n",
-    "def evolve_scfd(theta, alpha, gamma, dt, dx):\\n",
-    "    \"\"\"Evolve symbolic coherence field dynamics\"\"\"\\n",
-    "    nx, ny = theta.shape\\n",
-    "    theta_new = theta.copy()\\n",
-    "    \\n",
-    "    for i in range(1, nx-1):\\n",
-    "        for j in range(1, ny-1):\\n",
-    "            # Gradients\\n",
-    "            dtheta_dx = (theta[i+1,j] - theta[i-1,j]) / (2*dx)\\n",
-    "            dtheta_dy = (theta[i,j+1] - theta[i,j-1]) / (2*dx)\\n",
-    "            \\n",
-    "            # Laplacian\\n",
-    "            laplacian = (theta[i+1,j] + theta[i-1,j] + theta[i,j+1] + theta[i,j-1] - 4*theta[i,j]) / (dx*dx)\\n",
-    "            \\n",
-    "            # Convective term\\n",
-    "            convective = dtheta_dx * dtheta_dx + dtheta_dy * dtheta_dy\\n",
-    "            \\n",
-    "            # Coherence tension\\n",
-    "            coherence = alpha * np.sin(theta[i,j])\\n",
-    "            \\n",
-    "            # Evolution equation\\n",
-    "            dtheta_dt = -convective + coherence + gamma * laplacian\\n",
-    "            theta_new[i,j] = theta[i,j] + dt * dtheta_dt\\n",
-    "    \\n",
+    "@jit(nopython=True)",
+    "def evolve_scfd(theta, alpha, gamma, dt, dx):",
+    "    \"\"\"Evolve symbolic coherence field dynamics\"\"\"",
+    "    nx, ny = theta.shape",
+    "    theta_new = theta.copy()",
+    "    ",
+    "    for i in range(1, nx-1):",
+    "        for j in range(1, ny-1):",
+    "            # Gradients",
+    "            dtheta_dx = (theta[i+1,j] - theta[i-1,j]) / (2*dx)",
+    "            dtheta_dy = (theta[i,j+1] - theta[i,j-1]) / (2*dx)",
+    "            ",
+    "            # Laplacian",
+    "            laplacian = (theta[i+1,j] + theta[i-1,j] + theta[i,j+1] + theta[i,j-1] - 4*theta[i,j]) / (dx*dx)",
+    "            ",
+    "            # Convective term",
+    "            convective = dtheta_dx * dtheta_dx + dtheta_dy * dtheta_dy",
+    "            ",
+    "            # Coherence tension",
+    "            coherence = alpha * np.sin(theta[i,j])",
+    "            ",
+    "            # Evolution equation",
+    "            dtheta_dt = -convective + coherence + gamma * laplacian",
+    "            theta_new[i,j] = theta[i,j] + dt * dtheta_dt",
+    "    ",
     "    return theta_new"
    ]
   },
@@ -158,29 +158,29 @@ sympy>=1.9.0</pre>
    "metadata": {},
    "outputs": [],
    "source": [
-    "# Initialize simulation\\n",
-    "nx, ny = 128, 128\\n",
-    "dx = 1.0\\n",
-    "dt = 0.01\\n",
-    "\\n",
-    "# Parameters\\n",
-    "alpha = 0.8  # coherence tension\\n",
-    "gamma = 0.15  # symbolic viscosity\\n",
-    "\\n",
-    "# Initialize field with vortex + noise\\n",
-    "theta = np.zeros((nx, ny))\\n",
-    "center_x, center_y = nx//2, ny//2\\n",
-    "\\n",
-    "for i in range(nx):\\n",
-    "    for j in range(ny):\\n",
-    "        dx_pos = i - center_x\\n",
-    "        dy_pos = j - center_y\\n",
-    "        r = np.sqrt(dx_pos*dx_pos + dy_pos*dy_pos)\\n",
-    "        angle = np.arctan2(dy_pos, dx_pos)\\n",
-    "        \\n",
-    "        # Vortex pattern\\n",
-    "        vortex = 8.0 * np.exp(-r*r/100) * np.sin(2*angle)\\n",
-    "        noise = 0.3 * (np.random.random() - 0.5)\\n",
+    "# Initialize simulation",
+    "nx, ny = 128, 128",
+    "dx = 1.0",
+    "dt = 0.01",
+    "",
+    "# Parameters",
+    "alpha = 0.8  # coherence tension",
+    "gamma = 0.15  # symbolic viscosity",
+    "",
+    "# Initialize field with vortex + noise",
+    "theta = np.zeros((nx, ny))",
+    "center_x, center_y = nx//2, ny//2",
+    "",
+    "for i in range(nx):",
+    "    for j in range(ny):",
+    "        dx_pos = i - center_x",
+    "        dy_pos = j - center_y",
+    "        r = np.sqrt(dx_pos*dx_pos + dy_pos*dy_pos)",
+    "        angle = np.arctan2(dy_pos, dx_pos)",
+    "        ",
+    "        # Vortex pattern",
+    "        vortex = 8.0 * np.exp(-r*r/100) * np.sin(2*angle)",
+    "        noise = 0.3 * (np.random.random() - 0.5)",
     "        theta[i,j] = vortex + noise"
    ]
   },
@@ -190,22 +190,22 @@ sympy>=1.9.0</pre>
    "metadata": {},
    "outputs": [],
    "source": [
-    "# Interactive visualization\\n",
-    "fig, ax = plt.subplots(figsize=(10, 8))\\n",
-    "\\n",
-    "def update_plot(step):\\n",
-    "    global theta\\n",
-    "    for _ in range(10):\\n",
-    "        theta = evolve_scfd(theta, alpha, gamma, dt, dx)\\n",
-    "    \\n",
-    "    ax.clear()\\n",
-    "    im = ax.imshow(theta, cmap='twilight', interpolation='bilinear')\\n",
-    "    ax.set_title(f'SCFD Evolution - Step {step}')\\n",
-    "    plt.colorbar(im, ax=ax)\\n",
-    "    return im\\n",
-    "\\n",
-    "# Create interactive widget\\n",
-    "step_slider = widgets.IntSlider(value=0, min=0, max=100, step=1, description='Step:')\\n",
+    "# Interactive visualization",
+    "fig, ax = plt.subplots(figsize=(10, 8))",
+    "",
+    "def update_plot(step):",
+    "    global theta",
+    "    for _ in range(10):",
+    "        theta = evolve_scfd(theta, alpha, gamma, dt, dx)",
+    "    ",
+    "    ax.clear()",
+    "    im = ax.imshow(theta, cmap='twilight', interpolation='bilinear')",
+    "    ax.set_title(f'SCFD Evolution - Step {step}')",
+    "    plt.colorbar(im, ax=ax)",
+    "    return im",
+    "",
+    "# Create interactive widget",
+    "step_slider = widgets.IntSlider(value=0, min=0, max=100, step=1, description='Step:')",
     "widgets.interactive(update_plot, step=step_slider)"
    ]
   }
@@ -232,7 +232,7 @@ sympy>=1.9.0</pre>
  "nbformat": 4,
  "nbformat_minor": 4
 }</pre>
-      <button class="download-btn" onclick="downloadFile('SCFD_Interactive.ipynb', document.querySelectorAll('pre')[2].textContent)">Download Notebook</button>
+      <button class="download-btn" onclick="downloadFile('SCFD_Interactive.ipynb', document.getElementById('notebook-content').textContent)">Download Notebook</button>
     </div>
   </div>
 
