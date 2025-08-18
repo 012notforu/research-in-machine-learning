@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Coherence Field Theory (SCFD Workflow)</title>
+  <link rel="icon" href="data:," />
+  <style>
+    html, body { height: 100%; margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif }
+    body { background: #0a0a0f; color: #e1e8f0; padding: 20px }
+    .container { max-width: 1200px; margin: 0 auto }
+    .section { background: #12121a; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 20px; margin-bottom: 20px }
+    h1, h2 { color: #64ffda }
+    pre { background: #1a1a2e; padding: 15px; border-radius: 8px; overflow-x: auto; font-size: 12px }
+    code { background: #2a2a4a; padding: 2px 4px; border-radius: 4px }
+    .download-btn { background: #64ffda; color: #001b1f; padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; margin: 10px 0 }
+    .download-btn:hover { background: #4fc3f7 }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="section">
+      <h1>🌊 Coherence Field Theory (SCFD Workflow)</h1>
+      <p>One-file bundle: README + notebook + requirements</p>
+    </div>
+
+    <div class="section">
+      <h2>📖 README</h2>
+      <pre># SCFD Interactive: Symbolic Coherence Field Dynamics
+
+## Overview
+This notebook implements a symbolic approach to fluid dynamics where coherence patterns emerge from phase field evolution. The system uses a modified Navier-Stokes-like equation with symbolic viscosity and coherence tension.
+
+## Key Concepts
+- **Symbolic Phase Field**: θ(x,y,t) represents coherent structures
+- **Coherence Tension**: α sin(θ) creates pattern-forming potential
+- **Symbolic Viscosity**: γ∇²θ provides dissipation
+- **Convective Coupling**: (∇θ·∇)θ creates nonlinear dynamics
+
+## Mathematical Framework
+The core equation is:
+∂θ/∂t + (∇θ·∇)θ = -α sin(θ) + γ∇²θ
+
+Where:
+- θ: symbolic phase field
+- α: coherence tension strength
+- γ: symbolic viscosity
+- (∇θ·∇)θ: convective nonlinearity
+
+## Features
+- Real-time field evolution visualization
+- Parameter space exploration
+- Pattern detection and analysis
+- Energy and momentum conservation tracking
+- Fourier spectrum analysis
+- Spatial correlation functions
+
+## Usage
+1. Run the initialization cell to set up the simulation
+2. Adjust parameters in the control panel
+3. Start evolution and observe emergent patterns
+4. Use analysis tools to study the dynamics
+
+## Requirements
+See requirements_scfd_interactive.txt for dependencies.</pre>
+    </div>
+
+    <div class="section">
+      <h2>📋 Requirements</h2>
+      <pre>numpy>=1.21.0
+matplotlib>=3.5.0
+scipy>=1.7.0
+ipywidgets>=7.6.0
+plotly>=5.0.0
+pandas>=1.3.0
+seaborn>=0.11.0
+tqdm>=4.62.0
+numba>=0.56.0
+sympy>=1.9.0</pre>
+      <button class="download-btn" onclick="downloadFile('requirements_scfd_interactive.txt', document.querySelector('pre').textContent)">Download Requirements</button>
+    </div>
+
+    <div class="section">
+      <h2>📓 Jupyter Notebook</h2>
+      <pre>{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# SCFD Interactive: Symbolic Coherence Field Dynamics\\n",
+    "\\n",
+    "This notebook implements a symbolic approach to fluid dynamics where coherence patterns emerge from phase field evolution."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import numpy as np\\n",
+    "import matplotlib.pyplot as plt\\n",
+    "from scipy.ndimage import convolve\\n",
+    "import ipywidgets as widgets\\n",
+    "from IPython.display import display, clear_output\\n",
+    "import plotly.graph_objects as go\\n",
+    "from plotly.subplots import make_subplots\\n",
+    "import pandas as pd\\n",
+    "import seaborn as sns\\n",
+    "from tqdm.notebook import tqdm\\n",
+    "from numba import jit\\n",
+    "import sympy as sp\\n",
+    "\\n",
+    "# Set up plotting\\n",
+    "plt.style.use('dark_background')\\n",
+    "sns.set_palette(\"husl\")\\n",
+    "%matplotlib inline"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "@jit(nopython=True)\\n",
+    "def evolve_scfd(theta, alpha, gamma, dt, dx):\\n",
+    "    \"\"\"Evolve symbolic coherence field dynamics\"\"\"\\n",
+    "    nx, ny = theta.shape\\n",
+    "    theta_new = theta.copy()\\n",
+    "    \\n",
+    "    for i in range(1, nx-1):\\n",
+    "        for j in range(1, ny-1):\\n",
+    "            # Gradients\\n",
+    "            dtheta_dx = (theta[i+1,j] - theta[i-1,j]) / (2*dx)\\n",
+    "            dtheta_dy = (theta[i,j+1] - theta[i,j-1]) / (2*dx)\\n",
+    "            \\n",
+    "            # Laplacian\\n",
+    "            laplacian = (theta[i+1,j] + theta[i-1,j] + theta[i,j+1] + theta[i,j-1] - 4*theta[i,j]) / (dx*dx)\\n",
+    "            \\n",
+    "            # Convective term\\n",
+    "            convective = dtheta_dx * dtheta_dx + dtheta_dy * dtheta_dy\\n",
+    "            \\n",
+    "            # Coherence tension\\n",
+    "            coherence = alpha * np.sin(theta[i,j])\\n",
+    "            \\n",
+    "            # Evolution equation\\n",
+    "            dtheta_dt = -convective + coherence + gamma * laplacian\\n",
+    "            theta_new[i,j] = theta[i,j] + dt * dtheta_dt\\n",
+    "    \\n",
+    "    return theta_new"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Initialize simulation\\n",
+    "nx, ny = 128, 128\\n",
+    "dx = 1.0\\n",
+    "dt = 0.01\\n",
+    "\\n",
+    "# Parameters\\n",
+    "alpha = 0.8  # coherence tension\\n",
+    "gamma = 0.15  # symbolic viscosity\\n",
+    "\\n",
+    "# Initialize field with vortex + noise\\n",
+    "theta = np.zeros((nx, ny))\\n",
+    "center_x, center_y = nx//2, ny//2\\n",
+    "\\n",
+    "for i in range(nx):\\n",
+    "    for j in range(ny):\\n",
+    "        dx_pos = i - center_x\\n",
+    "        dy_pos = j - center_y\\n",
+    "        r = np.sqrt(dx_pos*dx_pos + dy_pos*dy_pos)\\n",
+    "        angle = np.arctan2(dy_pos, dx_pos)\\n",
+    "        \\n",
+    "        # Vortex pattern\\n",
+    "        vortex = 8.0 * np.exp(-r*r/100) * np.sin(2*angle)\\n",
+    "        noise = 0.3 * (np.random.random() - 0.5)\\n",
+    "        theta[i,j] = vortex + noise"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Interactive visualization\\n",
+    "fig, ax = plt.subplots(figsize=(10, 8))\\n",
+    "\\n",
+    "def update_plot(step):\\n",
+    "    global theta\\n",
+    "    for _ in range(10):\\n",
+    "        theta = evolve_scfd(theta, alpha, gamma, dt, dx)\\n",
+    "    \\n",
+    "    ax.clear()\\n",
+    "    im = ax.imshow(theta, cmap='twilight', interpolation='bilinear')\\n",
+    "    ax.set_title(f'SCFD Evolution - Step {step}')\\n",
+    "    plt.colorbar(im, ax=ax)\\n",
+    "    return im\\n",
+    "\\n",
+    "# Create interactive widget\\n",
+    "step_slider = widgets.IntSlider(value=0, min=0, max=100, step=1, description='Step:')\\n",
+    "widgets.interactive(update_plot, step=step_slider)"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.8.0"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 4
+}</pre>
+      <button class="download-btn" onclick="downloadFile('SCFD_Interactive.ipynb', document.querySelectorAll('pre')[2].textContent)">Download Notebook</button>
+    </div>
+  </div>
+
+  <script>
+    function downloadFile(filename, content) {
+      const blob = new Blob([content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+  </script>
+</body>
+</html>
