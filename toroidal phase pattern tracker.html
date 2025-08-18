@@ -1143,22 +1143,23 @@
                 const startTime = performance.now();
                 const size = this.config.gridSize;
                 
-                // Convert grid to complex field
-                const field = new Array(size);
-                for (let i = 0; i < size; i++) {
-                    field[i] = new Array(size);
-                    for (let j = 0; j < size; j++) {
-                        const phase = this.grid[i][j] * 2 * Math.PI / this.config.phaseStates;
-                        field[i][j] = {
-                            real: Math.cos(phase),
-                            imag: Math.sin(phase)
-                        };
+                try {
+                    // Convert grid to complex field
+                    const field = new Array(size);
+                    for (let i = 0; i < size; i++) {
+                        field[i] = new Array(size);
+                        for (let j = 0; j < size; j++) {
+                            const phase = this.grid[i][j] * 2 * Math.PI / this.config.phaseStates;
+                            field[i][j] = {
+                                real: Math.cos(phase),
+                                imag: Math.sin(phase)
+                            };
+                        }
                     }
-                }
-                
-                // FFT convolution
-                const fieldFFT = FastFFT.fft2d(field);
-                const kernelFFT = FastFFT.fft2d(this.kernel.kernel);
+                    
+                    // FFT convolution
+                    const fieldFFT = FastFFT.fft2d(field);
+                    const kernelFFT = FastFFT.fft2d(this.kernel.kernel);
                 
                 // Multiply in frequency domain
                 for (let i = 0; i < size; i++) {
@@ -1196,6 +1197,11 @@
                         const normalizedPhase = ((newPhase % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
                         this.grid[i][j] = Math.round(normalizedPhase * this.config.phaseStates / (2 * Math.PI)) % this.config.phaseStates;
                     }
+                }
+                } catch (error) {
+                    console.error('FFT evolution error:', error);
+                    // Fallback to naive evolution
+                    this.evolveNaive();
                 }
             }
             

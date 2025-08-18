@@ -200,9 +200,15 @@
       
       useEffect(() => {
         if (isRunning) {
-          evolveField();
+          const animate = () => {
+            if (isRunning) {
+              evolveField();
+              requestAnimationFrame(animate);
+            }
+          };
+          requestAnimationFrame(animate);
         }
-      }, [isRunning, evolveField]);
+      }, [isRunning]);
       
       useEffect(() => {
         renderCanvas();
