@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Field Dynamics Lab — Spin Diagnostics</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg,#0f0f23 0%,#1a1a2e 100%); color:#e1e8f0; }
+    .header { background: rgba(255,255,255,0.02); backdrop-filter: blur(10px); border-bottom:1px solid rgba(255,255,255,0.1); padding: 20px; text-align:center; }
+    .header h1 { color:#64ffda; font-size: 28px; font-weight:300; margin-bottom:6px; }
+    .header p { color:#b0bec5; font-size: 13px; opacity:0.85; }
+
+    .main { display:grid; grid-template-columns: 360px 1fr; height: calc(100vh - 100px); gap:1px; background: rgba(255,255,255,0.05); }
+    .left { background: rgba(15,15,35,0.95); border-right:1px solid rgba(255,255,255,0.1); overflow-y:auto; }
+    .right { background: rgba(26,26,46,0.95); display:flex; flex-direction: column; }
+
+    .section { border-bottom:1px solid rgba(255,255,255,0.06); }
+    .section h3 { padding: 14px 18px; color:#64ffda; font-size:14px; font-weight:600; background: rgba(255,255,255,0.02); display:flex; align-items:center; justify-content:space-between; cursor:pointer; }
+    .section .content { padding: 16px 18px; }
+
+    .row { display:flex; gap:10px; align-items:center; margin: 10px 0; }
+    .label { font-size: 12px; color:#b0bec5; }
+    .num { width: 90px; padding:6px 8px; border-radius:6px; border:1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.05); color:#e1e8f0; font-size:12px; text-align:center; }
+    .btn { background: linear-gradient(135deg,#64ffda 0%,#00bcd4 100%); color:#001015; border:none; border-radius:8px; padding:10px 14px; font-weight:600; cursor:pointer; font-size:12px; }
+    .btn.secondary { background: rgba(255,255,255,0.08); color:#e1e8f0; border:1px solid rgba(255,255,255,0.15); }
+    .btn:active { transform: translateY(1px); }
+
+    .visbar { display:flex; align-items:center; gap:8px; padding: 12px 18px; border-bottom:1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.02); }
+    .visbar .title { color:#64ffda; font-weight:600; font-size:14px; margin-right:auto; }
+    .chip { padding: 6px 12px; border-radius: 18px; font-size:12px; cursor:pointer; border:1px solid rgba(100,255,218,0.35); color:#64ffda; background: rgba(100,255,218,0.10); }
+    .chip.active { background: rgba(100,255,218,0.30); box-shadow: 0 0 16px rgba(100,255,218,0.35); }
+
+    .canvas-wrap { flex:1; position:relative; margin: 16px; border-radius: 12px; overflow:hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.35); }
+    canvas { width:100%; height:100%; background:#000; display:block; }
+
+    .overlay { position:absolute; top:12px; left:12px; font-size:12px; color:#b0bec5; background: rgba(0,0,0,0.6); border:1px solid rgba(100,255,218,0.3); padding: 10px 12px; border-radius:8px; min-width: 220px; }
+    .overlay b { color:#64ffda; font-weight:600; }
+
+    .status { background: rgba(0,0,0,0.5); border-top:1px solid rgba(255,255,255,0.1); display:flex; gap:16px; font-size:12px; color:#9fb0bb; padding: 10px 18px; }
+    .status .v { color:#64ffda; font-weight:600; }
+
+    .toggle { appearance:none; width:40px; height:20px; border-radius:20px; position:relative; background: rgba(255,255,255,0.14); outline:none; cursor:pointer; border:1px solid rgba(255,255,255,0.22); }
+    .toggle::after { content:""; position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:#fff; transition: transform 0.15s ease; }
+    .toggle:checked { background:#64ffda; border-color:#64ffda; }
+    .toggle:checked::after { transform: translateX(20px); }
+
+    .divider { height:1px; background: rgba(255,255,255,0.08); margin: 12px 0; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Field Dynamics Lab — Spin Diagnostics</h1>
+    <p>2D toroidal phase field with emergent structure. Extra overlays validate that spin-like patterns are emergent (no explicit vorticity term).</p>
+  </div>
+
+  <div class="main">
+    <div class="left">
+      <div class="section">
+        <h3>🎛 Simulation</h3>
+        <div class="content">
+          <div class="row"><span class="label">Nonlinearity α</span><input class="num" id="alpha" type="number" step="0.1" value="0.5"></div>
+          <div class="row"><span class="label">Coherence κ</span><input class="num" id="coherence" type="number" step="0.05" value="0.2"></div>
+          <div class="row"><span class="label">Diffusion γ</span><input class="num" id="gamma" type="number" step="0.01" value="0.05"></div>
+          <div class="row"><span class="label">Time step Δt</span><input class="num" id="dt" type="number" step="0.001" value="0.005"></div>
+          <div class="divider"></div>
+          <div class="row"><span class="label">Inject active</span><input id="injectToggle" type="checkbox" class="toggle"></div>
+          <div class="row"><span class="label">Strength</span><input class="num" id="injStrength" type="number" step="0.1" value="2.0"></div>
+          <div class="row"><span class="label">Radius</span><input class="num" id="injRadius" type="number" step="1" value="8"></div>
+          <div class="row"><button class="btn" id="play">▶ Play</button><button class="btn secondary" id="step">Step</button><button class="btn secondary" id="reset">Reset</button></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3>📡 Multi-frequency signal</h3>
+        <div class="content">
+          <div class="row"><span class="label">Add freq (Hz)</span><input class="num" id="mfFreq" type="number" step="0.1" placeholder="40"><span class="label">amp</span><input class="num" id="mfAmp" type="number" step="0.001" value="0.01"><button class="btn secondary" id="addFreq">Add</button></div>
+          <div id="freqList" style="font-size:12px; color:#b0bec5; line-height:1.6;"></div>
+          <div class="divider"></div>
+          <div style="font-size:12px; color:#9fb0bb">Quick toggles:</div>
+          <div class="row" style="flex-wrap:wrap; gap:6px; margin-top:6px;">
+            <button class="chip" data-preset="alpha">Alpha 10Hz</button>
+            <button class="chip" data-preset="beta">Beta 20Hz</button>
+            <button class="chip" data-preset="gamma">Gamma 40Hz</button>
+            <button class="chip" data-preset="theta">Theta 6Hz</button>
+            <button class="chip" data-preset="delta">Delta 2Hz</button>
+            <button class="chip" data-preset="schumann">Schumann 7.83Hz</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3>🧪 Diagnostics</h3>
+        <div class="content">
+          <div class="row"><label class="label" style="min-width:160px;">Orientation flow overlay</label><input id="orientToggle" type="checkbox" class="toggle" checked></div>
+          <div class="row"><label class="label" style="min-width:160px;">Downsample (px)</label><input class="num" id="orientStep" type="number" step="1" value="8"></div>
+          <div class="row"><label class="label" style="min-width:160px;">Arrow scale</label><input class="num" id="orientScale" type="number" step="0.1" value="8"></div>
+          <div class="divider"></div>
+          <div style="font-size:12px; color:#9fb0bb;">The spin proxy is ω̂ = (∂x θ̇)(∂y θ) − (∂y θ̇)(∂x θ). No curl(∇θ) term is coded.</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3>🎛 Presets</h3>
+        <div class="content">
+          <div class="row" style="flex-wrap:wrap; gap:8px;">
+            <button class="btn secondary" data-sys="responsive">Responsive</button>
+            <button class="btn secondary" data-sys="coherent">High Coherence</button>
+            <button class="btn secondary" data-sys="chaotic">Chaotic</button>
+            <button class="btn secondary" data-sys="stable">Stable</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="right">
+      <div class="visbar">
+        <div class="title">Field Visualization</div>
+        <button class="chip active" data-vis="field">Field</button>
+        <button class="chip" data-vis="energy">Energy</button>
+        <button class="chip" data-vis="coherence">Coherence</button>
+        <button class="chip" data-vis="gradient">Gradient</button>
+        <button class="chip" data-vis="spin">Spin proxy ω̂</button>
+      </div>
+
+      <div class="canvas-wrap">
+        <canvas id="canvas" width="960" height="640"></canvas>
+        <div class="overlay" id="overlay">
+          <div>t: <b id="t">0.000</b> · fps: <b id="fps">--</b></div>
+          <div>avg energy: <b id="eAvg">--</b> · avg |Φ|: <b id="cAvg">--</b></div>
+          <div>corr(energy, coherence): <b id="corr">--</b></div>
+          <div>RMS curl(∇θ): <b id="curl">--</b></div>
+          <div>RMS spin ω̂: <b id="spinrms">--</b></div>
+        </div>
+      </div>
+
+      <div class="status">
+        <div>Sim: <span class="v" id="sim">Paused</span></div>
+        <div>Inject: <span class="v" id="inj">Off</span></div>
+        <div>Active freqs: <span class="v" id="freqs">0</span></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    class Lab {
+      constructor() {
+        // canvas
+        this.cnv = document.getElementById('canvas');
+        this.ctx = this.cnv.getContext('2d');
+        // grid
+        this.N = 128; this.dx = 1.0/this.N; this.dt = 0.005; this.time = 0;
+        // params
+        this.alpha = 0.5; this.kappa = 0.2; this.gamma = 0.05; this.beta = 1.0; this.eps = 0.1;
+        // injection
+        this.injectOn = false; this.injStrength = 2.0; this.injRadius = 8; this.freqs = new Map();
+        // vis
+        this.mode = 'field'; this.showOrient = true; this.orientStep = 8; this.orientScale = 8;
+
+        // fields
+        this.theta = this.grid(); this.theta_t = this.grid();
+        this.theta_new = this.grid(); this.theta_t_new = this.grid();
+        this.energy = this.grid(); this.coherence = this.grid(); this.gradmag = this.grid();
+        this.spin = this.grid(); this.curlGrad = this.grid();
+        // structure tensor components (smoothed)
+        this.J11 = this.grid(); this.J22 = this.grid(); this.J12 = this.grid();
+        this.angle = this.grid(); this.aniso = this.grid();
+
+        // init
+        this.initField();
+        this.bindUI();
+        this.last = performance.now();
+        this.loop();
+      }
+
+      grid() { return Array(this.N).fill().map(()=>Array(this.N).fill(0)); }
+      idx(i){ return (i%this.N+this.N)%this.N; }
+      val(A,i,j){ return A[this.idx(i)][this.idx(j)]; }
+
+      grad(A,i,j){
+        const gx = (this.val(A,i+1,j) - this.val(A,i-1,j))/(2*this.dx);
+        const gy = (this.val(A,i,j+1) - this.val(A,i,j-1))/(2*this.dx);
+        return {x:gx,y:gy};
+      }
+
+      lap(A,i,j){
+        const c = this.val(A,i,j);
+        const dxx = (this.val(A,i+1,j) - 2*c + this.val(A,i-1,j))/(this.dx*this.dx);
+        const dyy = (this.val(A,i,j+1) - 2*c + this.val(A,i,j-1))/(this.dx*this.dx);
+        return dxx + dyy;
+      }
+
+      initField(){
+        for(let i=0;i<this.N;i++) for(let j=0;j<this.N;j++){
+          this.theta[i][j] = 0.01*(Math.random()-0.5);
+          this.theta_t[i][j] = 0.001*(Math.random()-0.5);
+        }
+        this.time = 0;
+        this.aux();
+      }
+
+      // Multi-frequency combined signal at t
+      signal(t){
+        if(this.freqs.size===0) return 0;
+        let s=0; this.freqs.forEach(({freq,amp,active})=>{ if(active!==false){ s += amp*Math.sin(2*Math.PI*freq*t)*Math.exp(-t*0.1); }});
+        return s;
+      }
+
+      inject(){
+        if(!this.injectOn || this.freqs.size===0) return;
+        const cx = Math.floor(this.N/2), cy = Math.floor(this.N/2), R = this.injRadius;
+        const amp = this.signal(this.time) * this.injStrength * 0.01;
+        for(let di=-R;di<=R;di++) for(let dj=-R;dj<=R;dj++){
+          const i=cx+di, j=cy+dj; const d2=di*di+dj*dj; if(d2>R*R) continue;
+          const g = Math.exp(-d2/(R*R/3));
+          this.theta[this.idx(i)][this.idx(j)] += amp*g;
+          this.theta_t[this.idx(i)][this.idx(j)] += 0.1*amp*g;
+        }
+      }
+
+      step(){
+        // update params from UI
+        this.alpha = parseFloat(document.getElementById('alpha').value);
+        this.kappa = parseFloat(document.getElementById('coherence').value);
+        this.gamma = parseFloat(document.getElementById('gamma').value);
+        this.dt    = parseFloat(document.getElementById('dt').value);
+        this.injStrength = parseFloat(document.getElementById('injStrength').value);
+        this.injRadius   = parseInt(document.getElementById('injRadius').value);
+        this.showOrient  = document.getElementById('orientToggle').checked;
+        this.orientStep  = parseInt(document.getElementById('orientStep').value);
+        this.orientScale = parseFloat(document.getElementById('orientScale').value);
+
+        // inject
+        this.inject();
+
+        const eps2 = this.eps*this.eps;
+        for(let i=0;i<this.N;i++) for(let j=0;j<this.N;j++){
+          const g = this.grad(this.theta,i,j);
+          const lap = this.lap(this.theta,i,j);
+          const gm2 = g.x*g.x + g.y*g.y;
+          const denom = Math.pow(eps2 + gm2, 1.5);
+          const nonlinear = this.alpha * lap / denom; // focusing
+          const diff      = this.gamma * lap;         // diffusion
+          let cohfb = 0;
+          if(this.kappa>0){
+            // local coherence via small window alignment (reuse from previous aux to save time would be more optimal; we recompute lightweight version)
+            const r=1; let sum=0, cnt=0;
+            const cgx=g.x,cgy=g.y; const cmag=Math.sqrt(gm2)||1e-9;
+            for(let di=-r;di<=r;di++) for(let dj=-r;dj<=r;dj++){
+              if(di===0&&dj===0) continue;
+              const nb = this.grad(this.theta,i+di,j+dj);
+              const nmag = Math.hypot(nb.x,nb.y); if(nmag<1e-9) continue;
+              const align = (cgx*nb.x + cgy*nb.y)/(cmag*nmag);
+              const dist = Math.hypot(di,dj); const w = Math.exp(-dist/r);
+              sum += align*w; cnt += w;
+            }
+            const localCoh = cnt>0 ? sum/cnt : 0;
+            cohfb = this.kappa * localCoh * lap;
+          }
+          const accel = (1/this.beta) * (nonlinear + diff + cohfb);
+          this.theta_t_new[i][j] = this.theta_t[i][j] + this.dt*accel;
+          this.theta_new[i][j]   = this.theta[i][j] + this.dt*this.theta_t_new[i][j];
+          // guard
+          if(!Number.isFinite(this.theta_new[i][j]) || Math.abs(this.theta_new[i][j])>100){
+            this.theta_new[i][j] = 0.9*this.theta[i][j];
+            this.theta_t_new[i][j]= 0.9*this.theta_t[i][j];
+          }
+        }
+        // swap
+        [this.theta, this.theta_new] = [this.theta_new, this.theta];
+        [this.theta_t, this.theta_t_new] = [this.theta_t_new, this.theta_t];
+        this.time += this.dt;
+        this.aux();
+      }
+
+      // compute energy, coherence, gradient magnitude, spin proxy, curl(grad), and structure tensor
+      aux(){
+        // First pass: gradients, energy, raw J
+        let eSum=0, cSum=0, curlSum=0, spinSum=0, eList=[], cList=[];
+        const Gx = this.grid(), Gy = this.grid();
+        const Gxt = this.grid(), Gyt = this.grid();
+        for(let i=0;i<this.N;i++) for(let j=0;j<this.N;j++){
+          const g = this.grad(this.theta,i,j);
+          const gt= this.grad(this.theta_t,i,j);
+          Gx[i][j]=g.x; Gy[i][j]=g.y; Gxt[i][j]=gt.x; Gyt[i][j]=gt.y;
+
+          const gm = Math.hypot(g.x,g.y);
+          this.gradmag[i][j] = gm;
+
+          const kinetic = 0.5*this.beta*this.theta_t[i][j]*this.theta_t[i][j];
+          const gradE   = 0.5*(g.x*g.x + g.y*g.y);
+          const en = kinetic + gradE; this.energy[i][j]=en; eSum += en; eList.push(en);
+
+          // simple local coherence: reuse alignment in 3x3 window
+          let sum=0,cnt=0; const r=1; const cmag = gm||1e-9; const cgx=g.x,cgy=g.y;
+          for(let di=-r;di<=r;di++) for(let dj=-r;dj<=r;dj++){
+            if(di===0&&dj===0) continue; const nb = this.grad(this.theta,i+di,j+dj);
+            const nmag = Math.hypot(nb.x,nb.y); if(nmag<1e-9) continue;
+            const align = (cgx*nb.x + cgy*nb.y)/(cmag*nmag);
+            const dist=Math.hypot(di,dj), w=Math.exp(-dist/r);
+            sum += align*w; cnt += w;
+          }
+          const coh = cnt>0? sum/cnt : 0; this.coherence[i][j]=coh; cSum += coh; cList.push(coh);
+
+          // spin proxy ω̂ = (∂x θ̇)(∂y θ) − (∂y θ̇)(∂x θ)
+          const sp = Gxt[i][j]*Gy[i][j] - Gyt[i][j]*Gx[i][j];
+          this.spin[i][j] = sp; spinSum += sp*sp;
+        }
+
+        // curl(∇θ) via ∂xGy − ∂yGx
+        for(let i=0;i<this.N;i++) for(let j=0;j<this.N;j++){
+          const dGy_dx = (this.val(Gy,i+1,j)-this.val(Gy,i-1,j))/(2*this.dx);
+          const dGx_dy = (this.val(Gx,i,j+1)-this.val(Gx,i,j-1))/(2*this.dx);
+          const curlz = dGy_dx - dGx_dy; this.curlGrad[i][j]=curlz; curlSum += curlz*curlz;
+        }
+
+        // Structure tensor components and smoothing (box blur radius=1)
+        for(let i=0;i<this.N;i++) for(let j=0;j<this.N;j++){
+          const gx=Gx[i][j], gy=Gy[i][j];
+          this.J11[i][j] = gx*gx; this.J22[i][j] = gy*gy; this.J12[i][j] = gx*gy;
+        }
+        const blur = (S)=>{
+          const B = this.grid(); const r=1; const k = (2*r+1)*(2*r+1);
+          for(let i=0;i<this.N;i++) for(let j=0;j<this.N;j++){
+            let s=0; for(let di=-r;di<=r;di++) for(let dj=-r;dj<=r;dj++) s += this.val(S,i+di,j+dj);
+            B[i][j] = s/k;
+          }
+          return B;
+        };
+        this.J11 = blur(this.J11); this.J22 = blur(this.J22); this.J12 = blur(this.J12);
+
+        // orientation angle and anisotropy (coherence) from eigen-decomposition
+        const eps = 1e-9;
+        for(let i=0;i<this.N;i++) for(let j=0;j<this.N;j++){
+          const a=this.J11[i][j], b=this.J12[i][j], d=this.J22[i][j];
+          // principal orientation
+          const ang = 0.5*Math.atan2(2*b, a - d); // [-pi/2, pi/2]
+          this.angle[i][j] = ang;
+          // anisotropy = (λ1-λ2)/(λ1+λ2)
+          const disc = Math.sqrt((a-d)*(a-d) + 4*b*b);
+          const l1 = 0.5*(a+d+disc), l2 = 0.5*(a+d-disc);
+          const an = (l1 - l2) / (l1 + l2 + eps);
+          this.aniso[i][j] = an;
+        }
+
+        // stats
+        const Npx = this.N*this.N;
+        this.stats = {
+          eAvg: eSum/Npx,
+          cAvg: cSum/Npx,
+          curlRMS: Math.sqrt(curlSum/Npx),
+          spinRMS: Math.sqrt(spinSum/Npx),
+          corr: (()=>{ // Pearson corr between energy and coherence
+            let me=0, mc=0; for(let k=0;k<eList.length;k++){ me+=eList[k]; mc+=cList[k]; }
+            me/=eList.length; mc/=cList.length;
+            let cov=0, ve=0, vc=0; for(let k=0;k<eList.length;k++){ const de=eList[k]-me, dc=cList[k]-mc; cov+=de*dc; ve+=de*de; vc+=dc*dc; }
+            const denom = Math.sqrt(ve*vc) || 1e-9; return cov/denom;
+          })()
+        };
+      }
+
+      color(val, symmetric){
+        if(!Number.isFinite(val)) return [0,0,0,255];
+        let min=this.cmin, max=this.cmax; const eps=1e-12;
+        let t = (val - min)/((max-min)+eps); t = Math.max(0,Math.min(1,t));
+        if(this.mode==='field'){
+          // blue-white-red
+          if(t<0.5){ const u=t*2; return [u*255,u*255,255,255]; } else { const u=(t-0.5)*2; return [255,(1-u)*255,(1-u)*255,255]; }
+        }
+        if(this.mode==='energy'){ return [t*255,t*255,0,255]; }
+        if(this.mode==='coherence'){ return [0,t*120,255*t,255]; }
+        if(this.mode==='gradient'){ return [0,t*255,t*255,255]; }
+        if(this.mode==='spin'){
+          // diverging purple→gray→lime
+          const mid = 0.5; if(t<mid){ const u=t/mid; return [160*u,120*u,255*(1-u),255]; } else { const u=(t-mid)/(1-mid); return [120*(1-u),255*u,120*u,255]; }
+        }
+        return [255*t,255*t,255*t,255];
+      }
+
+      updateRange(){
+        let data;
+        switch(this.mode){
+          case 'field': data=this.theta; break;
+          case 'energy': data=this.energy; break;
+          case 'coherence': data=this.coherence; break;
+          case 'gradient': data=this.gradmag; break;
+          case 'spin': data=this.spin; break;
+          default: data=this.theta;
+        }
+        let min=Infinity, max=-Infinity;
+        for(let i=0;i<this.N;i++) for(let j=0;j<this.N;j++){ const v=data[i][j]; if(Number.isFinite(v)){ if(v<min)min=v; if(v>max)max=v; } }
+        if(this.mode==='field' || this.mode==='spin'){
+          const a = Math.max(Math.abs(min), Math.abs(max)); this.cmin=-a; this.cmax=a;
+        } else { this.cmin=min; this.cmax=max; }
+      }
+
+      render(){
+        this.updateRange();
+        const w=this.cnv.width, h=this.cnv.height; const img=this.ctx.createImageData(w,h); const px=img.data;
+        const sx=w/this.N, sy=h/this.N;
+        let idx=0;
+        for(let y=0;y<h;y++){
+          const gy = Math.floor(y/sy);
+          for(let x=0;x<w;x++){
+            const gx = Math.floor(x/sx);
+            let v;
+            switch(this.mode){
+              case 'field': v=this.theta[gx][gy]; break;
+              case 'energy': v=this.energy[gx][gy]; break;
+              case 'coherence': v=this.coherence[gx][gy]; break;
+              case 'gradient': v=this.gradmag[gx][gy]; break;
+              case 'spin': v=this.spin[gx][gy]; break;
+              default: v=this.theta[gx][gy];
+            }
+            const [r,g,b,a] = this.color(v);
+            px[idx++]=r; px[idx++]=g; px[idx++]=b; px[idx++]=a;
+          }
+        }
+        this.ctx.putImageData(img,0,0);
+
+        // Orientation overlay
+        if(this.showOrient){
+          this.ctx.save();
+          this.ctx.translate(0.5,0.5);
+          this.ctx.lineWidth = 1;
+          this.ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+          const step = Math.max(4,this.orientStep);
+          for(let i=0;i<this.N;i+=step){
+            for(let j=0;j<this.N;j+=step){
+              const ang=this.angle[i][j]; const an=this.aniso[i][j];
+              const len = this.orientScale * an; if(len<0.5) continue;
+              const cx = (i+0.5)*sx; const cy=(j+0.5)*sy; const dx=len*Math.cos(ang), dy=len*Math.sin(ang);
+              this.ctx.beginPath();
+              this.ctx.moveTo(cx-dx, cy-dy);
+              this.ctx.lineTo(cx+dx, cy+dy);
+              this.ctx.stroke();
+            }
+          }
+          this.ctx.restore();
+        }
+
+        // overlay stats
+        document.getElementById('t').textContent = this.time.toFixed(3);
+        document.getElementById('eAvg').textContent = this.stats.eAvg.toFixed(3);
+        document.getElementById('cAvg').textContent = this.stats.cAvg.toFixed(3);
+        document.getElementById('curl').textContent = this.stats.curlRMS.toExponential(2);
+        document.getElementById('spinrms').textContent = this.stats.spinRMS.toExponential(2);
+        document.getElementById('corr').textContent = this.stats.corr.toFixed(3);
+      }
+
+      loop(){
+        const tick = (t)=>{
+          const dt = t - this.last; this.last = t; this.fps = 1000/Math.max(1,dt);
+          if(this.running) this.step();
+          this.render();
+          document.getElementById('fps').textContent = Math.round(this.fps);
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      }
+
+      bindUI(){
+        const visBtns = Array.from(document.querySelectorAll('[data-vis]'));
+        visBtns.forEach(b=>b.addEventListener('click',()=>{
+          visBtns.forEach(x=>x.classList.remove('active'));
+          b.classList.add('active');
+          this.mode = b.getAttribute('data-vis');
+        }));
+
+        const sysBtns = Array.from(document.querySelectorAll('[data-sys]'));
+        sysBtns.forEach(b=>b.addEventListener('click',()=>{
+          const type=b.getAttribute('data-sys');
+          switch(type){
+            case 'responsive':
+              alpha.value='0.8'; coherence.value='0.1'; gamma.value='0.02';
+              break;
+            case 'coherent':
+              alpha.value='0.5'; coherence.value='0.4'; gamma.value='0.03';
+              break;
+            case 'chaotic':
+              alpha.value='1.2'; coherence.value='0.05'; gamma.value='0.01';
+              break;
+            case 'stable':
+              alpha.value='0.3'; coherence.value='0.3'; gamma.value='0.08';
+              break;
+          }
+        }));
+
+        // play/pause/step/reset
+        const playBtn = document.getElementById('play');
+        const stepBtn = document.getElementById('step');
+        const resetBtn = document.getElementById('reset');
+        playBtn.addEventListener('click',()=>{ this.running = !this.running; playBtn.textContent = this.running? '⏸ Pause':'▶ Play'; document.getElementById('sim').textContent = this.running? 'Running':'Paused'; });
+        stepBtn.addEventListener('click',()=>{ this.step(); this.render(); });
+        resetBtn.addEventListener('click',()=>{ this.initField(); });
+
+        // inject toggle
+        const injT = document.getElementById('injectToggle'); injT.addEventListener('change',()=>{ this.injectOn = injT.checked; document.getElementById('inj').textContent = this.injectOn? 'Active':'Off'; });
+
+        // presets chips
+        const chipMap = {
+          alpha:{freq:10,amp:0.01}, beta:{freq:20,amp:0.015}, gamma:{freq:40,amp:0.03}, theta:{freq:6,amp:0.015}, delta:{freq:2,amp:0.01}, schumann:{freq:7.83,amp:0.01}
+        };
+        Array.from(document.querySelectorAll('[data-preset]')).forEach(ch=>{
+          ch.addEventListener('click',()=>{
+            const k=ch.getAttribute('data-preset');
+            const id='preset-'+k;
+            if(this.freqs.has(id)){ this.freqs.delete(id); ch.classList.remove('active'); }
+            else { this.freqs.set(id,{...chipMap[k], active:true}); ch.classList.add('active'); }
+            this.refreshFreqList();
+          });
+        });
+
+        // add manual frequency
+        document.getElementById('addFreq').addEventListener('click',()=>{
+          const f=parseFloat(document.getElementById('mfFreq').value);
+          const a=parseFloat(document.getElementById('mfAmp').value);
+          if(Number.isFinite(f) && f>0 && Number.isFinite(a) && a>0){
+            const id='manual-'+Date.now();
+            this.freqs.set(id,{freq:f,amp:a,active:true});
+            document.getElementById('mfFreq').value='';
+            document.getElementById('mfAmp').value='0.01';
+            this.refreshFreqList();
+          }
+        });
+
+        window.addEventListener('resize',()=>{ const wrap = document.querySelector('.canvas-wrap'); this.cnv.width=wrap.clientWidth; this.cnv.height=wrap.clientHeight; });
+        const wrap = document.querySelector('.canvas-wrap'); this.cnv.width=wrap.clientWidth; this.cnv.height=wrap.clientHeight;
+      }
+
+      refreshFreqList(){
+        const div=document.getElementById('freqList');
+        if(this.freqs.size===0){ div.innerHTML = '<em>No active frequencies</em>'; document.getElementById('freqs').textContent='0'; return; }
+        let html=''; this.freqs.forEach((v,id)=>{
+          html += `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin:4px 0;">`
+               + `<span>${v.freq.toFixed(2)} Hz @ ${v.amp}</span>`
+               + `<span>`
+               + `<button class="btn secondary" style="padding:4px 8px;font-size:11px;" onclick="lab.toggleFreq('${id}')">${v.active!==false?'On':'Off'}</button>`
+               + `<button class="btn secondary" style="padding:4px 8px;font-size:11px;" onclick="lab.removeFreq('${id}')">✕</button>`
+               + `</span></div>`;
+        });
+        div.innerHTML = html; document.getElementById('freqs').textContent = String(this.freqs.size);
+      }
+
+      toggleFreq(id){ const v=this.freqs.get(id); if(!v) return; v.active = !v.active; this.refreshFreqList(); }
+      removeFreq(id){ this.freqs.delete(id); this.refreshFreqList(); }
+    }
+
+    const lab = new Lab();
+    window.lab = lab; // for console access
+  </script>
+</body>
+</html>
