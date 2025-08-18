@@ -1,3 +1,29 @@
+## Research hub link
+**What is this link?**  
+`research-hub.html` is the repo’s landing page—a single, static dashboard that lists every simulation by category and links to each project file. Open it in your browser after starting a local server; click any card to launch that simulation. Everything runs client-side (no build step, no data collection).
+
+** Open locally:** http://localhost:8000/research-hub.html
+
+> This repo contains interactive machine-learning & physics simulations. To run them, serve the folder over a local web server (no installs beyond Python or Node required).
+
+### Quick Start (pick one)
+
+**Option A — Python (built-in on macOS/Linux, easy on Windows):**
+```bash
+# from the repo root
+python3 -m http.server 8000
+# then open:
+# http://localhost:8000/research-hub.html
+
+Option B — Node (if you have Node.js):
+# from the repo root
+npx http-server -p 8000
+# then open:
+# http://localhost:8000/research-hub.html
+
+
+
+
 # Research Engineering Portfolio — Experiments, Techniques, and Traces of Logic
 
 **Purpose.** This repository is a curated portfolio of small, reproducible research artifacts. It showcases how I approach open-ended problems: form a hypothesis, build the smallest testable system, evaluate against a baseline, and iterate with evidence.
