@@ -241,7 +241,7 @@
       <div class="category">
         <h2><span class="category-icon">🌊</span>Phase Field Dynamics</h2>
         <div class="project-list">
-          <a href="coherence-curvature sim" class="project-item">
+          <a href="coherence-curvature%20sim" class="project-item">
             <div class="project-info">
               <div class="project-name">Coherence-Curvature Sim</div>
               <div class="project-desc">Phase coherence visualization with curvature analysis</div>
@@ -251,7 +251,7 @@
             </div>
           </a>
           
-          <a href="lattice phase field sim" class="project-item">
+          <a href="lattice%20phase%20field%20sim" class="project-item">
             <div class="project-info">
               <div class="project-name">Lattice Phase Field Sim</div>
               <div class="project-desc">Quantum symbolic complexity with lattice dynamics</div>
@@ -261,7 +261,7 @@
             </div>
           </a>
           
-          <a href="Wave to grid" class="project-item">
+          <a href="Wave%20to%20grid" class="project-item">
             <div class="project-info">
               <div class="project-name">Wave to Grid</div>
               <div class="project-desc">Wave function to grid transformation</div>
@@ -277,7 +277,7 @@
       <div class="category">
         <h2><span class="category-icon">⚡</span>Gauge Theory & Topology</h2>
         <div class="project-list">
-          <a href="Symbolic Gauge Lab" class="project-item">
+          <a href="Symbolic%20Gauge%20Lab" class="project-item">
             <div class="project-info">
               <div class="project-name">Symbolic Gauge Lab</div>
               <div class="project-desc">Emergence v2.1 with labeled controls</div>
@@ -287,7 +287,7 @@
             </div>
           </a>
           
-          <a href="3D torus curvature testing" class="project-item">
+          <a href="3D torus%20curvature%20testing" class="project-item">
             <div class="project-info">
               <div class="project-name">3D Torus Curvature Testing</div>
               <div class="project-desc">Three-dimensional toroidal curvature analysis</div>
@@ -297,7 +297,7 @@
             </div>
           </a>
           
-          <a href="toroidal phase pattern tracker" class="project-item">
+          <a href="toroidal%20phase%20pattern%20tracker" class="project-item">
             <div class="project-info">
               <div class="project-name">Toroidal Phase Pattern Tracker</div>
               <div class="project-desc">Pattern tracking on toroidal surfaces</div>
@@ -313,7 +313,7 @@
       <div class="category">
         <h2><span class="category-icon">🔬</span>Field Dynamics & Diagnostics</h2>
         <div class="project-list">
-          <a href="Field dynamics lab-spin diagnostics" class="project-item">
+          <a href="Field%20dynamics%20lab-spin%20diagnostics" class="project-item">
             <div class="project-info">
               <div class="project-name">Field Dynamics Lab</div>
               <div class="project-desc">Spin diagnostics and field analysis</div>
@@ -323,7 +323,7 @@
             </div>
           </a>
           
-          <a href="NOT NS, symbolic fluid" class="project-item">
+          <a href="NOT%20NS,%20symbolic%20fluid" class="project-item">
             <div class="project-info">
               <div class="project-name">Symbolic Fluid Dynamics</div>
               <div class="project-desc">Non-Navier-Stokes symbolic fluid simulation</div>
@@ -339,7 +339,7 @@
       <div class="category">
         <h2><span class="category-icon">📐</span>Mathematical Models</h2>
         <div class="project-list">
-          <a href="EM-inspired 2d toroidal toy model" class="project-item">
+          <a href="EM-inspired%202d%20toroidal%20toy%20model" class="project-item">
             <div class="project-info">
               <div class="project-name">EM-Inspired 2D Toroidal Model</div>
               <div class="project-desc">Electromagnetic-inspired toy model</div>
@@ -349,7 +349,7 @@
             </div>
           </a>
           
-          <a href="Very early model" class="project-item">
+          <a href="Very%20early%20model" class="project-item">
             <div class="project-info">
               <div class="project-name">Very Early Model</div>
               <div class="project-desc">Initial prototype and concept testing</div>
@@ -425,3 +425,18 @@
   </script>
 </body>
 </html> 
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const overrides = {
+    'coherence-curvature sim': 'coherence-curvature sim.html',
+    'n_ary_phasor_research_platform.html': 'n_ary_phasor_research_platform.html'
+  };
+
+  document.querySelectorAll('a.project-item').forEach(a => {
+    let raw = a.getAttribute('href') || '';
+    let target = overrides[raw] 
+      || (/\.[a-z0-9]+$/i.test(raw) ? raw : raw.replace(/\/?$/, '/index.html')); // add /index.html if no extension
+    a.setAttribute('href', encodeURI(target));
+  });
+});
+</script>
