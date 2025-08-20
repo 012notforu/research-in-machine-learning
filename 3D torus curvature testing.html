@@ -183,8 +183,8 @@
         
         <div class="control-group">
           <h3>⚙️ Physics</h3>
-          <label for="lambda">Curvature λ: <span id="lambdaVal">0.12</span></label>
-          <input type="range" id="lambda" min="0" max="0.3" value="0.12" step="0.01">
+          <label for="lambda">Curvature λ: <span id="lambdaVal">0.05</span></label>
+          <input type="range" id="lambda" min="0" max="0.3" value="0.05" step="0.01">
           
           <label for="gamma">Gradient γ: <span id="gammaVal">0.8</span></label>
           <input type="range" id="gamma" min="0.1" max="2" value="0.8" step="0.1">
@@ -258,7 +258,7 @@
           dx: 0.2, dy: 0.2, dz: 0.2, dt: 0.002,
           beta: 1.0,
           gamma: 0.8,
-          lambda: 0.12,
+          lambda: 0.05,
           kappa: 0.015,
           D: 0.15
         };
@@ -405,21 +405,21 @@
               const y = (j / ny) * 2 * Math.PI;
               const z = (k / nz) * 2 * Math.PI;
               
-              // Create topological structures
-              const mode1 = 0.3 * Math.sin(x) * Math.cos(y + z);
-              const mode2 = 0.25 * Math.cos(x + y) * Math.sin(z);
-              const mode3 = 0.2 * Math.sin(x + y + z);
-              const noise = 0.15 * (Math.random() - 0.5);
+              // Create topological structures (more stable)
+              const mode1 = 0.2 * Math.sin(x) * Math.cos(y + z);
+              const mode2 = 0.15 * Math.cos(x + y) * Math.sin(z);
+              const mode3 = 0.1 * Math.sin(x + y + z);
+              const noise = 0.05 * (Math.random() - 0.5);
               
-              // Add vortex-like structures
+              // Add vortex-like structures (gentler)
               const cx = i - nx / 2;
               const cy = j - ny / 2;
               const cz = k - nz / 2;
               const r2 = (cx * cx + cy * cy + cz * cz);
-              const gaussian = 0.4 * Math.exp(-r2 / (nx * nx / 16));
+              const gaussian = 0.2 * Math.exp(-r2 / (nx * nx / 16));
               
-              // Add winding number contributions
-              const winding = Math.atan2(cy, cx) * 0.1;
+              // Add winding number contributions (smaller)
+              const winding = Math.atan2(cy, cx) * 0.02;
               
               const val = mode1 + mode2 + mode3 + noise + gaussian + winding;
               this.fieldA[id] = val;
@@ -459,12 +459,17 @@
               
               const laplacian = dx2 + dy2 + dz2;
               
-              // Curvature coupling term (topological)
-              const curvatureTerm = lambda * current * current * current;
+              // Curvature coupling term (much gentler)
+              const curvatureTerm = lambda * current * current * 0.1;
               
-              // Evolution equation with topology
+              // Evolution equation with topology (stabilized)
               const rhs = gamma * laplacian + curvatureTerm + kappa * current;
-              target[id] = current + dt * rhs;
+              let newVal = current + dt * rhs;
+              
+              // Clamp to prevent explosion
+              newVal = Math.max(-2, Math.min(2, newVal));
+              
+              target[id] = newVal;
             }
           }
         }
@@ -719,7 +724,10 @@
       
       reset() {
         this.stop();
+        this.time = 0;
+        this.topologyHistory = [];
         this.initializeField();
+        this.updateMetrics();
         this.render();
       }
     }
