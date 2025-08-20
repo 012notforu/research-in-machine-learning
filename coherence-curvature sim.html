@@ -11,7 +11,7 @@
     }
     * { box-sizing: border-box; }
     body { margin:0; padding:20px; background:var(--bg); color:var(--ink); font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; line-height:1.4 }
-    .container { max-width: 1400px; margin: 0 auto; }
+    .container { max-width: 1800px; margin: 0 auto; }
     h1 { text-align:center; color:var(--acc); margin: 0 0 8px; font-size: clamp(1.3rem, 2.6vw, 2.2rem) }
     .subtitle { text-align:center; color:var(--muted); margin:0 0 20px; font-style: italic }
 
@@ -27,7 +27,7 @@
     .viz { display:grid; grid-template-columns: 1fr 1fr 1fr; gap:18px; margin-bottom:18px }
     .panel { background:var(--panel); border-radius:10px; padding:12px; text-align:center }
     .panel h3 { margin:0 0 8px; color:var(--acc); font-size:1rem }
-    canvas { border:1px solid var(--outline); border-radius:6px; width:100%; max-width:600px; height:auto; image-rendering: pixelated; display: block; margin: 0 auto; }
+    canvas { border:1px solid var(--outline); border-radius:6px; width:100%; max-width:800px; height:auto; image-rendering: pixelated; display: block; margin: 0 auto; }
     .hint { font-size:12px; color:var(--muted); margin-top:6px }
 
     .stats { background:var(--panel); padding:12px; border-radius:10px; display:grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap:12px }
@@ -37,8 +37,8 @@
 
     .note { background:var(--note); border-left:4px solid var(--acc); padding:12px; border-radius:0 8px 8px 0; margin-top:18px }
 
-    @media (max-width: 1400px) { .viz { grid-template-columns: 1fr 1fr } }
-    @media (max-width: 900px) { .viz { grid-template-columns: 1fr } }
+    @media (max-width: 1600px) { .viz { grid-template-columns: 1fr 1fr } }
+    @media (max-width: 1000px) { .viz { grid-template-columns: 1fr } }
   </style>
 </head>
 <body>
@@ -95,17 +95,17 @@
     <div class="viz">
       <div class="panel">
         <h3>Phase Field θ(x,y)</h3>
-        <canvas id="phaseCanvas" width="600" height="600"></canvas>
+        <canvas id="phaseCanvas" width="800" height="800"></canvas>
         <p class="hint">Hue encodes angle (0..2π). Toroidal wrap.</p>
       </div>
       <div class="panel">
         <h3>Local Coherence |Φ|</h3>
-        <canvas id="cohCanvas" width="600" height="600"></canvas>
+        <canvas id="cohCanvas" width="800" height="800"></canvas>
         <p class="hint">Circular mean of e^{iθ} over the selected kernel.</p>
       </div>
       <div class="panel">
         <h3 id="potTitle">Curvature-derived Potential (−Δ|Φ|)</h3>
-        <canvas id="potCanvas" width="600" height="600"></canvas>
+        <canvas id="potCanvas" width="800" height="800"></canvas>
         <p class="hint" id="potHint">Blue = wells (negative), Red = hills (positive).</p>
       </div>
     </div>
