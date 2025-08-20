@@ -1084,13 +1084,13 @@
                 });
                 
                 // System controls
-                document.getElementById('startBtn').addEventListener('click', () => this.start());
-                document.getElementById('pauseBtn').addEventListener('click', () => this.pause());
-                document.getElementById('resetBtn').addEventListener('click', () => this.reset());
-                document.getElementById('randomizeBtn').addEventListener('click', () => this.randomize());
-                document.getElementById('fftBtn').addEventListener('click', () => this.toggleFFT());
-                document.getElementById('huntBtn').addEventListener('click', () => this.huntLife());
-                document.getElementById('exportBtn').addEventListener('click', () => this.exportData());
+                document.getElementById('startBtn').addEventListener('click', () => self.start());
+                document.getElementById('pauseBtn').addEventListener('click', () => self.pause());
+                document.getElementById('resetBtn').addEventListener('click', () => self.reset());
+                document.getElementById('randomizeBtn').addEventListener('click', () => self.randomize());
+                document.getElementById('fftBtn').addEventListener('click', () => self.toggleFFT());
+                document.getElementById('huntBtn').addEventListener('click', () => self.huntLife());
+                document.getElementById('exportBtn').addEventListener('click', () => self.exportData());
                 
                 console.log('🎛️ Controls configured');
             }
@@ -1114,14 +1114,24 @@
                     if (self.isRunning) {
                         const startTime = performance.now();
                         
-                        self.evolveSystem();
-                        self.detectLife();
+                        try {
+                            self.evolveSystem();
+                            self.detectLife();
+                            self.renderSystem();
+                            self.updateMetrics();
+                            
+                            const endTime = performance.now();
+                            self.performanceData.frameTime = endTime - startTime;
+                            self.frameCount++;
+                        } catch (error) {
+                            console.error('Error in main loop:', error);
+                            self.pause();
+                            self.addOutput('❌ Error in evolution - system paused');
+                        }
+                    } else {
+                        // Still render when paused for responsive UI
                         self.renderSystem();
                         self.updateMetrics();
-                        
-                        const endTime = performance.now();
-                        self.performanceData.frameTime = endTime - startTime;
-                        self.frameCount++;
                     }
                     
                     requestAnimationFrame(mainLoop);
@@ -1156,46 +1166,56 @@
                     }
                 }
                 
-                // FFT convolution
-                const fieldFFT = FastFFT.fft2d(field);
-                const kernelFFT = FastFFT.fft2d(this.kernel.kernel);
-                
-                // Multiply in frequency domain
-                for (let i = 0; i < size; i++) {
-                    for (let j = 0; j < size; j++) {
-                        const a = fieldFFT[i][j];
-                        const b = kernelFFT[i][j];
-                        fieldFFT[i][j] = {
-                            real: a.real * b.real - a.imag * b.imag,
-                            imag: a.real * b.imag + a.imag * b.real
-                        };
+                try {
+                    // FFT convolution
+                    const fieldFFT = FastFFT.fft2d(field);
+                    const kernelFFT = FastFFT.fft2d(this.kernel.kernel);
+                    
+                    // Multiply in frequency domain
+                    for (let i = 0; i < size; i++) {
+                        for (let j = 0; j < size; j++) {
+                            const a = fieldFFT[i][j];
+                            const b = kernelFFT[i][j];
+                            fieldFFT[i][j] = {
+                                real: a.real * b.real - a.imag * b.imag,
+                                imag: a.real * b.imag + a.imag * b.real
+                            };
+                        }
                     }
-                }
-                
-                // Inverse FFT
-                const result = FastFFT.ifft2d(fieldFFT);
-                
-                const fftTime = performance.now() - startTime;
-                this.performanceData.fftTime = fftTime;
-                
-                // Apply delta function and update grid
-                for (let i = 0; i < size; i++) {
-                    for (let j = 0; j < size; j++) {
-                        const currentPhase = this.grid[i][j] * 2 * Math.PI / this.config.phaseStates;
-                        const targetPhase = Math.atan2(result[i][j].imag, result[i][j].real);
-                        
-                        // Smooth phase evolution with damping
-                        const phaseDiff = targetPhase - currentPhase;
-                        const wrappedDiff = ((phaseDiff + Math.PI) % (2 * Math.PI)) - Math.PI;
-                        
-                        const newPhase = currentPhase + 
-                            this.config.timeStep * Math.sin(wrappedDiff) - 
-                            this.config.damping * currentPhase;
-                        
-                        // Quantize back to discrete states
-                        const normalizedPhase = ((newPhase % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
-                        this.grid[i][j] = Math.round(normalizedPhase * this.config.phaseStates / (2 * Math.PI)) % this.config.phaseStates;
+                    
+                    // Inverse FFT
+                    const result = FastFFT.ifft2d(fieldFFT);
+                    
+                    const fftTime = performance.now() - startTime;
+                    this.performanceData.fftTime = fftTime;
+                    
+                    // Apply delta function and update grid with better stability
+                    for (let i = 0; i < size; i++) {
+                        for (let j = 0; j < size; j++) {
+                            const currentPhase = this.grid[i][j] * 2 * Math.PI / this.config.phaseStates;
+                            const targetPhase = Math.atan2(result[i][j].imag, result[i][j].real);
+                            
+                            // Smooth phase evolution with damping and stability checks
+                            const phaseDiff = targetPhase - currentPhase;
+                            const wrappedDiff = ((phaseDiff + Math.PI) % (2 * Math.PI)) - Math.PI;
+                            
+                            // Clamp the evolution to prevent instability
+                            const clampedDiff = Math.max(-0.5, Math.min(0.5, wrappedDiff));
+                            
+                            const newPhase = currentPhase + 
+                                this.config.timeStep * Math.sin(clampedDiff) - 
+                                this.config.damping * currentPhase;
+                            
+                            // Quantize back to discrete states with bounds checking
+                            const normalizedPhase = ((newPhase % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+                            const newState = Math.round(normalizedPhase * this.config.phaseStates / (2 * Math.PI));
+                            this.grid[i][j] = ((newState % this.config.phaseStates) + this.config.phaseStates) % this.config.phaseStates;
+                        }
                     }
+                } catch (error) {
+                    // Fallback to naive evolution if FFT fails
+                    console.warn('FFT failed, falling back to naive evolution:', error);
+                    this.evolveNaive();
                 }
             }
             
@@ -1601,10 +1621,44 @@
                 this.coherenceHistory = [];
                 this.frameCount = 0;
                 this.performanceData = { fftTime: 0, convTime: 0, frameTime: 0 };
+                this.highlightPattern = null;
                 
                 // Clear pattern library
                 const library = document.getElementById('patternLibrary');
                 library.innerHTML = '';
+                
+                // Reset all controls to default values
+                document.getElementById('phaseStates').value = 7;
+                document.getElementById('phaseStatesVal').textContent = '7-Phase';
+                this.config.phaseStates = 7;
+                
+                document.getElementById('gridSize').value = 128;
+                document.getElementById('gridSizeVal').textContent = '128×128';
+                this.config.gridSize = 128;
+                
+                document.getElementById('innerWeight').value = 1.0;
+                document.getElementById('innerWeightVal').textContent = '1.0';
+                document.getElementById('midWeight').value = 0.2;
+                document.getElementById('midWeightVal').textContent = '0.2';
+                document.getElementById('outerWeight').value = -0.1;
+                document.getElementById('outerWeightVal').textContent = '-0.1';
+                
+                document.getElementById('timeStep').value = 0.1;
+                document.getElementById('timeStepVal').textContent = '0.10';
+                this.config.timeStep = 0.1;
+                
+                document.getElementById('damping').value = 0.05;
+                document.getElementById('dampingVal').textContent = '0.05';
+                this.config.damping = 0.05;
+                
+                // Reinitialize kernel with default values
+                this.kernel = new MultiRingKernel(this.config.gridSize);
+                this.kernel.updateWeights(1.0, 0.2, -0.1);
+                
+                // Force re-render
+                this.renderSystem();
+                this.updateMetrics();
+                this.updateStatus();
                 
                 this.addOutput('🔄 System reset - clean slate for discovery');
             }
