@@ -27,7 +27,7 @@
     .viz { display:grid; grid-template-columns: 1fr 1fr 1fr; gap:18px; margin-bottom:18px }
     .panel { background:var(--panel); border-radius:10px; padding:12px; text-align:center }
     .panel h3 { margin:0 0 8px; color:var(--acc); font-size:1rem }
-    canvas { border:1px solid var(--outline); border-radius:6px; width:100%; max-width:420px; height:auto; image-rendering: pixelated }
+    canvas { border:1px solid var(--outline); border-radius:6px; width:100%; max-width:420px; height:auto; image-rendering: pixelated; display: block; margin: 0 auto; }
     .hint { font-size:12px; color:var(--muted); margin-top:6px }
 
     .stats { background:var(--panel); padding:12px; border-radius:10px; display:grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap:12px }
@@ -94,17 +94,17 @@
     <div class="viz">
       <div class="panel">
         <h3>Phase Field θ(x,y)</h3>
-        <canvas id="phaseCanvas" width="320" height="320"></canvas>
+        <canvas id="phaseCanvas" width="400" height="400"></canvas>
         <p class="hint">Hue encodes angle (0..2π). Toroidal wrap.</p>
       </div>
       <div class="panel">
         <h3>Local Coherence |Φ|</h3>
-        <canvas id="cohCanvas" width="320" height="320"></canvas>
+        <canvas id="cohCanvas" width="400" height="400"></canvas>
         <p class="hint">Circular mean of e^{iθ} over the selected kernel.</p>
       </div>
       <div class="panel">
         <h3 id="potTitle">Curvature-derived Potential (−Δ|Φ|)</h3>
-        <canvas id="potCanvas" width="320" height="320"></canvas>
+        <canvas id="potCanvas" width="400" height="400"></canvas>
         <p class="hint" id="potHint">Blue = wells (negative), Red = hills (positive).</p>
       </div>
     </div>
@@ -349,35 +349,65 @@
       renderAll(){ this.renderPhase(); this.renderCoherence(); this.renderPotential(); }
 
       renderPhase(){
-        const N=this.N, ctx=this.phaseCtx; const img = ctx.createImageData(N,N);
-        let p=0; for(let i=0;i<N;i++) for(let j=0;j<N;j++){
-          const th = this.theta[i][j];
-          const hue = ((th + Math.PI)/(2*Math.PI))*360; // 0..360
-          const [r,g,b] = this.hsv2rgb(hue,1,1);
-          img.data[p++] = r; img.data[p++] = g; img.data[p++] = b; img.data[p++] = 255;
+        const N=this.N, ctx=this.phaseCtx; 
+        const canvasWidth = ctx.canvas.width, canvasHeight = ctx.canvas.height;
+        const img = ctx.createImageData(canvasWidth, canvasHeight);
+        
+        for(let y=0; y<canvasHeight; y++){
+          for(let x=0; x<canvasWidth; x++){
+            const i = Math.floor((y * N) / canvasHeight);
+            const j = Math.floor((x * N) / canvasWidth);
+            const th = this.theta[i][j];
+            const hue = ((th + Math.PI)/(2*Math.PI))*360; // 0..360
+            const [r,g,b] = this.hsv2rgb(hue,1,1);
+            const p = (y * canvasWidth + x) * 4;
+            img.data[p] = r; img.data[p+1] = g; img.data[p+2] = b; img.data[p+3] = 255;
+          }
         }
         ctx.putImageData(img,0,0);
       }
 
       renderCoherence(){
-        const N=this.N, ctx=this.cohCtx; const img = ctx.createImageData(N,N);
-        let p=0; for(let i=0;i<N;i++) for(let j=0;j<N;j++){
-          const v = Math.max(0, Math.min(1, this.phiMag[i][j])); const c = (v*255)|0;
-          img.data[p++] = c; img.data[p++] = c; img.data[p++] = c; img.data[p++] = 255;
+        const N=this.N, ctx=this.cohCtx; 
+        const canvasWidth = ctx.canvas.width, canvasHeight = ctx.canvas.height;
+        const img = ctx.createImageData(canvasWidth, canvasHeight);
+        
+        for(let y=0; y<canvasHeight; y++){
+          for(let x=0; x<canvasWidth; x++){
+            const i = Math.floor((y * N) / canvasHeight);
+            const j = Math.floor((x * N) / canvasWidth);
+            const v = Math.max(0, Math.min(1, this.phiMag[i][j])); 
+            const c = (v*255)|0;
+            const p = (y * canvasWidth + x) * 4;
+            img.data[p] = c; img.data[p+1] = c; img.data[p+2] = c; img.data[p+3] = 255;
+          }
         }
         ctx.putImageData(img,0,0);
       }
 
       renderPotential(){
-        const N=this.N, ctx=this.potCtx; const img = ctx.createImageData(N,N);
+        const N=this.N, ctx=this.potCtx; 
+        const canvasWidth = ctx.canvas.width, canvasHeight = ctx.canvas.height;
+        const img = ctx.createImageData(canvasWidth, canvasHeight);
+        
         // compute symmetric range
-        let min=Infinity, max=-Infinity; for(let i=0;i<N;i++) for(let j=0;j<N;j++){ const v=this.potential[i][j]; if(v<min) min=v; if(v>max) max=v; }
+        let min=Infinity, max=-Infinity; 
+        for(let i=0;i<N;i++) for(let j=0;j<N;j++){ 
+          const v=this.potential[i][j]; 
+          if(v<min) min=v; if(v>max) max=v; 
+        }
         const scale = Math.max(Math.abs(min), Math.abs(max)) || 1;
-        let p=0; for(let i=0;i<N;i++) for(let j=0;j<N;j++){
-          const v = this.potential[i][j]/scale; // -1..1
-          let r=0,g=0,b=0;
-          if(v>=0){ r = Math.floor(255*v); } else { b = Math.floor(255*(-v)); }
-          img.data[p++] = r; img.data[p++] = g; img.data[p++] = b; img.data[p++] = 255;
+        
+        for(let y=0; y<canvasHeight; y++){
+          for(let x=0; x<canvasWidth; x++){
+            const i = Math.floor((y * N) / canvasHeight);
+            const j = Math.floor((x * N) / canvasWidth);
+            const v = this.potential[i][j]/scale; // -1..1
+            let r=0,g=0,b=0;
+            if(v>=0){ r = Math.floor(255*v); } else { b = Math.floor(255*(-v)); }
+            const p = (y * canvasWidth + x) * 4;
+            img.data[p] = r; img.data[p+1] = g; img.data[p+2] = b; img.data[p+3] = 255;
+          }
         }
         ctx.putImageData(img,0,0);
       }
