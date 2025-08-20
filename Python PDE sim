@@ -1,0 +1,351 @@
+
+import asyncio
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap
+from IPython.display import display, clear_output
+import ipywidgets as W
+
+# ---------------- helpers ----------------
+def discrete_cmap(k: int) -> ListedColormap:
+    if k <= 10:
+        base = [
+            (0.90, 0.10, 0.10), (0.10, 0.70, 0.10), (0.10, 0.20, 0.90),
+            (0.90, 0.60, 0.10), (0.55, 0.10, 0.70), (0.00, 0.70, 0.70),
+            (0.70, 0.70, 0.00), (0.80, 0.30, 0.50), (0.50, 0.50, 0.50),
+            (0.20, 0.20, 0.20),
+        ]
+        colors = base[:k]
+    else:
+        import colorsys
+        colors = [colorsys.hsv_to_rgb(i / k, 0.65, 0.95) for i in range(k)]
+    return ListedColormap(colors, name=f"scfd_k{k}")
+
+def neighbor_offsets(radius=1, kind="moore"):
+    offs = []
+    for dx in range(-radius, radius + 1):
+        for dy in range(-radius, radius + 1):
+            if dx == 0 and dy == 0:
+                continue
+            if kind == "moore" and max(abs(dx), abs(dy)) <= radius:
+                offs.append((dx, dy))
+            elif kind == "von_neumann" and (abs(dx) + abs(dy)) <= radius:
+                offs.append((dx, dy))
+    out = []
+    for dx, dy in offs:
+        n = (dx*dx + dy*dy) ** 0.5
+        out.append((dx, dy, dx/n, dy/n))
+    return np.array(out, dtype=float)  # (m,4): dx,dy,ux,uy
+
+def make_control_field(H, W, mode="none", rng=None):
+    rng = np.random.default_rng(None if rng is None else rng)
+    if mode == "none":
+        return np.zeros((H, W), dtype=float)
+    if mode == "gradient":
+        x = np.linspace(-1, 1, W); y = np.linspace(-1, 1, H)
+        X, Y = np.meshgrid(x, y)
+        return X
+    if mode == "gaussian_blob":
+        x0, y0 = rng.uniform(0, W), rng.uniform(0, H)
+        X, Y = np.meshgrid(np.arange(W), np.arange(H))
+        sigma = 0.18 * min(H, W)
+        return np.exp(-((X - x0)**2 + (Y - y0)**2) / (2*sigma*sigma))
+    if mode == "noise":
+        Z = rng.standard_normal((H, W))
+        # pure-numpy 3x3 blur
+        blur = (
+            Z
+            + np.roll(Z, 1, 0) + np.roll(Z, -1, 0)
+            + np.roll(Z, 1, 1) + np.roll(Z, -1, 1)
+            + np.roll(np.roll(Z, 1, 0), 1, 1)
+            + np.roll(np.roll(Z, 1, 0), -1, 1)
+            + np.roll(np.roll(Z, -1, 0), 1, 1)
+            + np.roll(np.roll(Z, -1, 0), -1, 1)
+        ) / 9.0
+        return blur
+    raise ValueError("Unknown control field mode")
+
+def grad2(C, i, j, periodic=True):
+    H, W = C.shape
+    if periodic:
+        ip = (i + 1) % H; im = (i - 1) % H
+        jp = (j + 1) % W; jm = (j - 1) % W
+    else:
+        ip = min(i + 1, H - 1); im = max(i - 1, 0)
+        jp = min(j + 1, W - 1); jm = max(j - 1, 0)
+    gx = 0.5 * (C[i, jp] - C[i, jm]); gy = 0.5 * (C[ip, j] - C[im, j])
+    return gx, gy
+
+# ---------------- SCFD engine ----------------
+class SCFDEngine:
+    """
+    SCFD gate: accept proposal if dE<0 AND H_min <= local entropy <= H_max.
+    Energy: alpha * (# neighbor mismatch) + chi * <grad C, d_i(S)>
+    """
+    def __init__(self, H=64, W=64, k=3, radius=1, neighborhood="moore",
+                 alpha=1.0, chi=0.0, H_min=0.0, H_max=None, periodic=True,
+                 control_mode="none", seed=0, proposer="majority"):
+        self.rng = np.random.default_rng(seed)
+        self.H, self.W = int(H), int(W)
+        self.k = int(k)
+        self.periodic = bool(periodic)
+        self.radius = int(radius)
+        self.neighborhood = str(neighborhood)
+        self.alpha = float(alpha); self.chi = float(chi)
+        self.H_min = float(H_min)
+        self.H_max = float(np.log2(self.k) if H_max is None else H_max)  # wide by default
+        self.control_mode = str(control_mode)
+        self.offsets = neighbor_offsets(self.radius, self.neighborhood)
+        self.S = self.rng.integers(0, self.k, size=(self.H, self.W), dtype=np.int32)
+        self.C = make_control_field(self.H, self.W, mode=self.control_mode, rng=self.rng)
+        self.accepted = 0; self.attempts = 0; self.ticks = 0
+        self.proposer = proposer  # "random" | "best3" | "majority" | "greedy_neighbors"
+
+    # --- mechanics ---
+    def wrap(self, i, j):
+        return (i % self.H, j % self.W) if self.periodic else (min(max(i,0), self.H-1), min(max(j,0), self.W-1))
+
+    def local_neighbors(self, i, j):
+        offs = self.offsets
+        ni = np.empty(len(offs), dtype=np.int32); nj = np.empty(len(offs), dtype=np.int32)
+        for idx, (dx, dy, *_r) in enumerate(offs):
+            ii, jj = self.wrap(i + int(dx), j + int(dy))
+            ni[idx] = ii; nj[idx] = jj
+        ux = offs[:,2]; uy = offs[:,3]
+        return ni, nj, ux, uy
+
+    def entropy_bits(self, i, j, center_symbol=None):
+        ni, nj, _, _ = self.local_neighbors(i, j)
+        vals = self.S[ni, nj].tolist()
+        vals.append(int(self.S[i, j] if center_symbol is None else center_symbol))
+        counts = np.bincount(vals, minlength=self.k).astype(float)
+        p = counts / counts.sum(); p = p[p>0]
+        return float(-np.sum(p*np.log2(p)))
+
+    def energy_i(self, i, j, symbol=None):
+        s = int(self.S[i, j] if symbol is None else symbol)
+        ni, nj, ux, uy = self.local_neighbors(i, j)
+        neigh = self.S[ni, nj]
+        mismatch = float(np.sum(neigh != s))
+        if self.chi != 0.0:
+            gx, gy = grad2(self.C, i, j, periodic=self.periodic)
+            mask = (neigh != s).astype(float)
+            dx = float(np.sum(ux * mask)); dy = float(np.sum(uy * mask))
+            align = gx*dx + gy*dy
+        else:
+            align = 0.0
+        return self.alpha*mismatch + self.chi*align
+
+    # --- proposers that actually move things ---
+    def _propose_random(self, i, j, old):
+        s_new = self.rng.integers(0, self.k - 1)
+        if s_new >= old: s_new += 1
+        return int(s_new)
+
+    def _propose_best3(self, i, j, old):
+        # sample 3 distinct candidates and pick the lowest-energy
+        cand = list(range(self.k)); cand.remove(old)
+        cand = self.rng.choice(cand, size=min(3, len(cand)), replace=False)
+        e_best, s_best = None, old
+        for s in cand:
+            e = self.energy_i(i, j, s)
+            if (e_best is None) or (e < e_best):
+                e_best, s_best = e, int(s)
+        if s_best == old and len(cand) < self.k-1:
+            # fallback: ensure a change
+            return self._propose_random(i, j, old)
+        return s_best
+
+    def _propose_majority(self, i, j, old):
+        ni, nj, _, _ = self.local_neighbors(i, j)
+        neigh = self.S[ni, nj]
+        counts = np.bincount(neigh, minlength=self.k)
+        order = np.argsort(counts)[::-1]  # most common first
+        for s in order:
+            if s != old:
+                return int(s)
+        return int((old + 1) % self.k)  # degenerate fallback
+
+    def _propose_greedy_neighbors(self, i, j, old):
+        # evaluate energy for unique neighbor symbols, pick min
+        ni, nj, _, _ = self.local_neighbors(i, j)
+        uniq = np.unique(self.S[ni, nj])
+        uniq = [int(s) for s in uniq if int(s) != old]
+        if not uniq:
+            return self._propose_random(i, j, old)
+        e_best, s_best = None, old
+        for s in uniq:
+            e = self.energy_i(i, j, s)
+            if (e_best is None) or (e < e_best):
+                e_best, s_best = e, int(s)
+        return s_best
+
+    def propose(self):
+        i = self.rng.integers(0, self.H); j = self.rng.integers(0, self.W)
+        old = int(self.S[i, j])
+        mode = self.proposer
+        if mode == "random":
+            new = self._propose_random(i, j, old)
+        elif mode == "best3":
+            new = self._propose_best3(i, j, old)
+        elif mode == "majority":
+            new = self._propose_majority(i, j, old)
+        elif mode == "greedy_neighbors":
+            new = self._propose_greedy_neighbors(i, j, old)
+        else:
+            new = self._propose_random(i, j, old)
+        return i, j, old, new
+
+    def step(self, n=1, gate_on=True):
+        acc = 0; n = int(n)
+        for _ in range(n):
+            i, j, old, new = self.propose()
+            dE = self.energy_i(i, j, new) - self.energy_i(i, j, old)
+            H_new = self.entropy_bits(i, j, center_symbol=new)
+            ok = (dE < 0.0) and (self.H_min <= H_new <= self.H_max) if gate_on else True
+            self.attempts += 1
+            if ok:
+                self.S[i, j] = new
+                self.accepted += 1
+                acc += 1
+        self.ticks += n
+        return acc
+
+    def acceptance_rate(self):
+        return 0.0 if self.attempts == 0 else self.accepted / self.attempts
+
+    def reset(self, **kwargs):
+        for k, v in kwargs.items():
+            setattr(self, k, v)
+        self.offsets = neighbor_offsets(self.radius, self.neighborhood)
+        self.S = self.rng.integers(0, self.k, size=(self.H, self.W), dtype=np.int32)
+        self.C = make_control_field(self.H, self.W, mode=self.control_mode, rng=self.rng)
+        self.accepted = 0; self.attempts = 0; self.ticks = 0
+
+# ---------------- interactive UI ----------------
+class SCFD_UI:
+    def __init__(self):
+        self.out = W.Output(layout=W.Layout(border='1px solid #444', height='520px'))
+        self.engine = SCFDEngine(proposer="majority")  # default: majority for motion
+        self.cmap = discrete_cmap(self.engine.k)
+        self._build_widgets()
+        self._wire_events()
+        self.fig = None; self.ax = None; self.im = None
+        self._runner_task = None
+        self._draw(init=True)
+
+    def _build_widgets(self):
+        Hk = float(np.log2(self.engine.k))
+        # core
+        self.size = W.IntSlider(value=64, min=16, max=256, step=8, description='Size')
+        self.k = W.IntSlider(value=self.engine.k, min=2, max=12, step=1, description='k')
+        self.radius = W.IntSlider(value=1, min=1, max=3, step=1, description='Radius')
+        self.neigh = W.Dropdown(options=[('Moore','moore'),('von Neumann','von_neumann')],
+                                value='moore', description='Neighborhood')
+        self.alpha = W.FloatSlider(value=1.0, min=0.0, max=5.0, step=0.1, description='alpha')
+        self.chi = W.FloatSlider(value=0.0, min=0.0, max=5.0, step=0.1, description='chi')
+        self.boundary = W.ToggleButtons(options=[('Periodic', True), ('Clamped', False)],
+                                        value=True, description='Boundary')
+        self.control = W.Dropdown(options=[('None','none'),('Gradient','gradient'),
+                                           ('Gaussian blob','gaussian_blob'),('Noise','noise')],
+                                  value='none', description='Control C')
+        # entropy band: start wide-open for motion
+        self.Hmin = W.FloatSlider(value=0.0, min=0.0, max=Hk, step=0.05, description='H_min')
+        self.Hmax = W.FloatSlider(value=Hk, min=0.0, max=Hk, step=0.05, description='H_max')
+        # proposer + gate + speed
+        self.proposer = W.Dropdown(
+            options=[('Random','random'), ('Best-of-3','best3'),
+                     ('Neighbor majority','majority'), ('Greedy over neighbors','greedy_neighbors')],
+            value='majority', description='Proposer'
+        )
+        self.gate_on = W.Checkbox(value=True, description='Gate ON (dE<0 & H band)')
+        self.steps_per_frame = W.IntSlider(value=2000, min=1, max=20000, step=1, description='Steps/frame')
+        self.run_btn = W.ToggleButton(value=False, description='Run', button_style='success')
+        self.step_btn = W.Button(description='Step once', button_style='info')
+        self.reset_btn = W.Button(description='Reset', button_style='warning')
+        self.status = W.HTML(value="Ready.")
+
+        left = W.VBox([self.size, self.k, self.radius, self.neigh, self.boundary, self.control])
+        mid  = W.VBox([self.alpha, self.chi, self.Hmin, self.Hmax, self.proposer, self.gate_on])
+        right= W.VBox([self.steps_per_frame, W.HBox([self.run_btn, self.step_btn, self.reset_btn]), self.status])
+        self.ui = W.HBox([left, mid, right])
+
+        display(self.ui, self.out)
+
+    def _wire_events(self):
+        def update_entropy_bounds(*_):
+            Hk = float(np.log2(self.k.value))
+            self.Hmin.max = Hk; self.Hmax.max = Hk
+            if self.Hmax.value > Hk: self.Hmax.value = Hk
+            if self.Hmin.value > self.Hmax.value: self.Hmin.value = max(0.0, self.Hmax.value - 0.1)
+        self.k.observe(update_entropy_bounds, names='value')
+
+        async def runner():
+            while self.run_btn.value:
+                acc = self.engine.step(int(self.steps_per_frame.value), gate_on=self.gate_on.value)
+                self._draw()
+                self.status.value = (
+                    f"Running: +{acc} / frame — accept {100.0*self.engine.acceptance_rate():.1f}% | ticks {self.engine.ticks}"
+                )
+                await asyncio.sleep(0.01)  # yield to UI
+
+        def on_run(change):
+            if change['name'] == 'value':
+                if change['new']:
+                    if self._runner_task is None or self._runner_task.done():
+                        self._runner_task = asyncio.create_task(runner())
+                else:
+                    # stop: task will exit next loop
+                    pass
+        self.run_btn.observe(on_run, names='value')
+
+        def on_step(_):
+            acc = self.engine.step(int(self.steps_per_frame.value), gate_on=self.gate_on.value)
+            self._draw()
+            self.status.value = (
+                f"Step: +{acc} / {self.steps_per_frame.value} — "
+                f"accept {100.0*self.engine.acceptance_rate():.1f}% | ticks {self.engine.ticks}"
+            )
+        self.step_btn.on_click(on_step)
+
+        def on_reset(_):
+            H = Wsz = int(self.size.value)
+            self.engine = SCFDEngine(
+                H=H, W=Wsz, k=int(self.k.value), radius=int(self.radius.value),
+                neighborhood=str(self.neigh.value), alpha=float(self.alpha.value),
+                chi=float(self.chi.value), H_min=float(self.Hmin.value), H_max=float(self.Hmax.value),
+                periodic=bool(self.boundary.value), control_mode=str(self.control.value),
+                proposer=str(self.proposer.value), seed=0
+            )
+            self.cmap = discrete_cmap(self.engine.k)
+            self._draw(init=True)
+            self.status.value = "<b>Reset</b> — lattice reinitialized."
+        self.reset_btn.on_click(on_reset)
+
+        def on_params_change(_):
+            self.engine.alpha = float(self.alpha.value)
+            self.engine.chi = float(self.chi.value)
+            self.engine.H_min = float(self.Hmin.value)
+            self.engine.H_max = float(self.Hmax.value)
+            self.engine.proposer = str(self.proposer.value)
+            self._draw()
+        for w in (self.alpha, self.chi, self.Hmin, self.Hmax, self.proposer):
+            w.observe(on_params_change, names='value')
+
+    def _draw(self, init=False):
+        with self.out:
+            if init or (self.fig is None):
+                clear_output(wait=True)
+                self.fig, self.ax = plt.subplots(figsize=(6,6), dpi=100)
+                self.im = self.ax.imshow(self.engine.S, interpolation='nearest',
+                                         cmap=self.cmap, vmin=0, vmax=self.engine.k-1)
+                self.ax.set_title("SCFD — lattice S")
+                self.ax.set_xticks([]); self.ax.set_yticks([])
+                plt.show()
+            else:
+                self.im.set_data(self.engine.S)
+                self.im.set_clim(0, self.engine.k-1)
+                self.ax.set_title("SCFD — lattice S")
+                self.fig.canvas.draw_idle()
+
+ui = SCFD_UI()
