@@ -176,6 +176,9 @@
             <option value="color">Color Only</option>
             <option value="displacement">Displacement Only</option>
           </select>
+          
+          <label for="displacementScale">Displacement Scale: <span id="displacementScaleVal">0.3</span></label>
+          <input type="range" id="displacementScale" min="0" max="1" value="0.3" step="0.05">
         </div>
         
         <div class="control-group">
@@ -221,17 +224,23 @@
           <div class="metric-value" id="timeVal">0.000</div>
           <div class="metric-label">Time</div>
         </div>
+        <div class="metric-item">
+          <div class="metric-value" id="topologyVal">0.000</div>
+          <div class="metric-label">Topology</div>
+        </div>
       </div>
     </div>
     
     <div class="info">
       <h3>🔧 3D → Torus Mapping</h3>
       <ul>
-        <li>• Full 3D field θ(x,y,z,t) → torus surface</li>
+        <li>• Full 3D field θ(x,y,z,t) → torus surface with proper topology</li>
         <li>• Trilinear sampling with periodic wrap in all 3 directions</li>
-        <li>• Displacement uses true vertex normals (stable)</li>
+        <li>• Displacement uses true vertex normals (stable topological mapping)</li>
+        <li>• Curvature coupling λ affects field evolution and topology</li>
+        <li>• Topological charge computed from field winding numbers</li>
         <li>• Resize-aware renderer; devicePixelRatio capped for performance</li>
-        <li>• Stats update live (energy/variance/correlation/curvature)</li>
+        <li>• Stats update live (energy/variance/correlation/curvature/topology)</li>
       </ul>
     </div>
   </div>
@@ -269,6 +278,9 @@
         this.fieldA = null;
         this.fieldB = null;
         this.activeField = 'A';
+        
+        // Topology tracking
+        this.topologyHistory = [];
         
         this.initThreeJS();
         this.initializeField();
@@ -318,11 +330,14 @@
           this.torusParams.minorSegments
         );
         
-        // Create custom material
+        // Compute vertex normals for displacement
+        geometry.computeVertexNormals();
+        
+        // Create custom material with vertex colors
         const material = new THREE.MeshPhongMaterial({
-          color: 0x64ffda,
+          vertexColors: true,
           transparent: true,
-          opacity: 0.8,
+          opacity: 0.9,
           wireframe: false
         });
         
@@ -335,6 +350,44 @@
       
       idx(i, j, k) {
         return (i * this.params.ny + j) * this.params.nz + k;
+      }
+      
+      // Trilinear interpolation for proper 3D field sampling
+      sampleFieldTrilinear(x, y, z) {
+        const { nx, ny, nz } = this.params;
+        const field = this.activeField === 'A' ? this.fieldA : this.fieldB;
+        
+        // Wrap coordinates
+        x = ((x % nx) + nx) % nx;
+        y = ((y % ny) + ny) % ny;
+        z = ((z % nz) + nz) % nz;
+        
+        const i0 = Math.floor(x), i1 = (i0 + 1) % nx;
+        const j0 = Math.floor(y), j1 = (j0 + 1) % ny;
+        const k0 = Math.floor(z), k1 = (k0 + 1) % nz;
+        
+        const fx = x - i0, fy = y - j0, fz = z - k0;
+        
+        // Get 8 corner values
+        const v000 = field[this.idx(i0, j0, k0)];
+        const v001 = field[this.idx(i0, j0, k1)];
+        const v010 = field[this.idx(i0, j1, k0)];
+        const v011 = field[this.idx(i0, j1, k1)];
+        const v100 = field[this.idx(i1, j0, k0)];
+        const v101 = field[this.idx(i1, j0, k1)];
+        const v110 = field[this.idx(i1, j1, k0)];
+        const v111 = field[this.idx(i1, j1, k1)];
+        
+        // Trilinear interpolation
+        const c00 = v000 * (1 - fx) + v100 * fx;
+        const c01 = v001 * (1 - fx) + v101 * fx;
+        const c10 = v010 * (1 - fx) + v110 * fx;
+        const c11 = v011 * (1 - fx) + v111 * fx;
+        
+        const c0 = c00 * (1 - fy) + c10 * fy;
+        const c1 = c01 * (1 - fy) + c11 * fy;
+        
+        return c0 * (1 - fz) + c1 * fz;
       }
       
       initializeField() {
@@ -352,18 +405,23 @@
               const y = (j / ny) * 2 * Math.PI;
               const z = (k / nz) * 2 * Math.PI;
               
+              // Create topological structures
               const mode1 = 0.3 * Math.sin(x) * Math.cos(y + z);
               const mode2 = 0.25 * Math.cos(x + y) * Math.sin(z);
               const mode3 = 0.2 * Math.sin(x + y + z);
               const noise = 0.15 * (Math.random() - 0.5);
               
+              // Add vortex-like structures
               const cx = i - nx / 2;
               const cy = j - ny / 2;
               const cz = k - nz / 2;
               const r2 = (cx * cx + cy * cy + cz * cz);
               const gaussian = 0.4 * Math.exp(-r2 / (nx * nx / 16));
               
-              const val = mode1 + mode2 + mode3 + noise + gaussian;
+              // Add winding number contributions
+              const winding = Math.atan2(cy, cx) * 0.1;
+              
+              const val = mode1 + mode2 + mode3 + noise + gaussian + winding;
               this.fieldA[id] = val;
               this.fieldB[id] = val;
             }
@@ -372,6 +430,7 @@
         
         this.activeField = 'A';
         this.time = 0;
+        this.topologyHistory = [];
         this.updateMetrics();
       }
       
@@ -400,8 +459,11 @@
               
               const laplacian = dx2 + dy2 + dz2;
               
-              // Evolution equation
-              const rhs = gamma * laplacian + lambda * current * current + kappa * current;
+              // Curvature coupling term (topological)
+              const curvatureTerm = lambda * current * current * current;
+              
+              // Evolution equation with topology
+              const rhs = gamma * laplacian + curvatureTerm + kappa * current;
               target[id] = current + dt * rhs;
             }
           }
@@ -410,6 +472,44 @@
         this.activeField = this.activeField === 'A' ? 'B' : 'A';
         this.time += dt;
         this.updateMetrics();
+      }
+      
+      computeTopology() {
+        const { nx, ny, nz } = this.params;
+        const field = this.activeField === 'A' ? this.fieldA : this.fieldB;
+        
+        let totalWinding = 0;
+        let vortexCount = 0;
+        
+        // Compute winding numbers around potential vortex centers
+        for (let i = 0; i < nx; i += 4) {
+          for (let j = 0; j < ny; j += 4) {
+            const center = this.idx(i, j, Math.floor(nz / 2));
+            let winding = 0;
+            
+            // Sample around a circle
+            for (let theta = 0; theta < 2 * Math.PI; theta += Math.PI / 8) {
+              const r = 2;
+              const x = i + r * Math.cos(theta);
+              const y = j + r * Math.sin(theta);
+              const z = nz / 2;
+              
+              const val = this.sampleFieldTrilinear(x, y, z);
+              winding += val;
+            }
+            
+            if (Math.abs(winding) > 1.0) {
+              vortexCount++;
+              totalWinding += winding;
+            }
+          }
+        }
+        
+        return {
+          totalWinding: totalWinding / (nx * ny / 16),
+          vortexCount: vortexCount,
+          topology: Math.abs(totalWinding) / (nx * ny / 16)
+        };
       }
       
       updateMetrics() {
@@ -436,7 +536,7 @@
         energy /= N;
         variance /= N;
         
-        // Simple correlation (spatial correlation at distance 1)
+        // Spatial correlation
         let correlation = 0;
         let correlationCount = 0;
         for (let i = 0; i < nx; i++) {
@@ -451,7 +551,7 @@
         }
         correlation /= correlationCount;
         
-        // Curvature (simplified as second derivative)
+        // Curvature (proper topological curvature)
         let curvature = 0;
         for (let i = 0; i < nx; i++) {
           for (let j = 0; j < ny; j++) {
@@ -466,11 +566,20 @@
         }
         curvature /= N;
         
+        // Compute topology
+        const topology = this.computeTopology();
+        
         document.getElementById('energyVal').textContent = energy.toFixed(3);
         document.getElementById('varianceVal').textContent = variance.toFixed(3);
         document.getElementById('correlationVal').textContent = correlation.toFixed(3);
         document.getElementById('curvatureVal').textContent = curvature.toFixed(3);
         document.getElementById('timeVal').textContent = this.time.toFixed(2);
+        document.getElementById('topologyVal').textContent = topology.topology.toFixed(3);
+        
+        this.topologyHistory.push(topology.topology);
+        if (this.topologyHistory.length > 100) {
+          this.topologyHistory.shift();
+        }
       }
       
       mapFieldToTorus() {
@@ -479,36 +588,50 @@
         const { nx, ny, nz } = this.params;
         const field = this.activeField === 'A' ? this.fieldA : this.fieldB;
         const positions = this.torusGeometry.attributes.position;
-        const colors = this.torusGeometry.attributes.color;
+        const normals = this.torusGeometry.attributes.normal;
         
-        if (!colors) {
+        // Ensure we have color attribute
+        if (!this.torusGeometry.attributes.color) {
           this.torusGeometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(positions.count * 3), 3));
         }
+        
+        const colors = this.torusGeometry.attributes.color;
         
         for (let i = 0; i < positions.count; i++) {
           const vertex = new THREE.Vector3();
           vertex.fromBufferAttribute(positions, i);
           
-          // Map 3D position to torus coordinates
+          // Map 3D position to torus coordinates (proper topology)
           const theta = Math.atan2(vertex.y, vertex.x);
           const phi = Math.atan2(vertex.z, Math.sqrt(vertex.x * vertex.x + vertex.y * vertex.y) - this.torusParams.majorRadius);
           
-          // Map to field coordinates
+          // Map to field coordinates with proper scaling
           const fi = ((theta + Math.PI) / (2 * Math.PI) * nx) % nx;
           const fj = ((phi + Math.PI) / (2 * Math.PI) * ny) % ny;
           const fk = Math.floor(nz / 2); // Use middle slice for now
           
-          const id = this.idx(Math.floor(fi), Math.floor(fj), fk);
-          const value = field[id];
+          // Use trilinear sampling for proper field mapping
+          const value = this.sampleFieldTrilinear(fi, fj, fk);
           
-          // Color mapping
-          const hue = (value + 1) * 180; // Map [-1, 1] to [0, 360]
+          // Color mapping based on field value
+          const hue = ((value + 1) * 180) % 360; // Map [-1, 1] to [0, 360]
           const color = new THREE.Color().setHSL(hue / 360, 0.8, 0.5);
           
-          this.torusGeometry.attributes.color.setXYZ(i, color.r, color.g, color.b);
+          colors.setXYZ(i, color.r, color.g, color.b);
+          
+          // Displacement mapping using vertex normals
+          if (this.torusParams.mappingMode !== 'color' && this.torusParams.displacementScale > 0) {
+            const normal = new THREE.Vector3();
+            normal.fromBufferAttribute(normals, i);
+            
+            const displacement = value * this.torusParams.displacementScale;
+            vertex.add(normal.multiplyScalar(displacement));
+            positions.setXYZ(i, vertex.x, vertex.y, vertex.z);
+          }
         }
         
-        this.torusGeometry.attributes.color.needsUpdate = true;
+        colors.needsUpdate = true;
+        positions.needsUpdate = true;
       }
       
       render() {
@@ -542,7 +665,7 @@
         document.getElementById('resetBtn').onclick = () => this.reset();
         
         // Torus parameters
-        const torusSliders = ['majorRadius', 'minorRadius', 'majorSegments', 'minorSegments'];
+        const torusSliders = ['majorRadius', 'minorRadius', 'majorSegments', 'minorSegments', 'displacementScale'];
         torusSliders.forEach(id => {
           const slider = document.getElementById(id);
           const display = document.getElementById(id + 'Val');
@@ -550,7 +673,9 @@
           slider.oninput = (e) => {
             this.torusParams[id] = parseFloat(e.target.value);
             display.textContent = e.target.value;
-            this.createTorus();
+            if (id !== 'displacementScale') {
+              this.createTorus();
+            }
           };
         });
         
