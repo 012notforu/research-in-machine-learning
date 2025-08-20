@@ -1,1341 +1,412 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Play, Pause, RotateCcw, Settings } from 'lucide-react';
-
-const QuantumSymbolicComplexity = () => {
-  const canvasRef = useRef(null);
-  const animationRef = useRef(null);
-  
-  // Core state
-  const [isRunning, setIsRunning] = useState(false);
-  const [time, setTime] = useState(0);
-  const [field, setField] = useState(null);
-  const [trailBuffer, setTrailBuffer] = useState(null);
-  
-  // Settings
-  const [settings, setSettings] = useState({
-    gridSize: 64,
-    diffusionRate: 0.1,
-    nonlinearStrength: 0.8,
-    complexityThreshold: 0.7,
-    showGrid: false,
-    showTrails: false,
-    trailDecay: 0.95,
-    enableAnalysis: false,
-    analysisMode: 'energy',
-    showPatterns: false
-  });
-  
-  // Metrics
-  const [complexity, setComplexity] = useState([]);
-  const [entropy, setEntropy] = useState([]);
-  const [circuitDepth, setCircuitDepth] = useState([]);
-  const [entropySpikes, setEntropySpikes] = useState([]);
-  
-  // Analysis data
-  const [energyHistory, setEnergyHistory] = useState([]);
-  const [momentumHistory, setMomentumHistory] = useState([]);
-  const [fourierSpectrum, setFourierSpectrum] = useState(null);
-  const [correlationData, setCorrelationData] = useState([]);
-  const [lyapunovExponent, setLyapunovExponent] = useState(0);
-  const [evolutionHistory, setEvolutionHistory] = useState([]);
-  
-  // Pattern detection data
-  const [detectedPatterns, setDetectedPatterns] = useState({
-    spirals: [],
-    waves: [],
-    symmetries: [],
-    topologicalCharge: 0
-  });
-  const [patternHistory, setPatternHistory] = useState([]);
-
-  // Utility: Get neighbors with periodic boundary conditions
-  const getNeighbors = (x, y, grid, gridSize) => {
-    return [
-      grid[(x+1) % gridSize]?.[y],
-      grid[x]?.[(y+1) % gridSize],
-      grid[(x-1+gridSize) % gridSize]?.[y],
-      grid[x]?.[(y-1+gridSize) % gridSize]
-    ].filter(Boolean);
-  };
-
-  // Initialize field with coherent structures
-  const initializeField = useCallback(() => {
-    const { gridSize } = settings;
-    
-    // Create base field
-    const newField = Array(gridSize).fill().map(() => 
-      Array(gridSize).fill().map(() => ({
-        phase: Math.random() * 2 * Math.PI,
-        amplitude: Math.random() * 0.5 + 0.1,
-        complexity: 0
-      }))
-    );
-    
-    // Add coherent structures
-    for (let i = 0; i < 3; i++) {
-      const cx = Math.floor(Math.random() * gridSize);
-      const cy = Math.floor(Math.random() * gridSize);
-      const radius = Math.floor(8 + Math.random() * 12); // INTEGER radius
-      
-      for (let dx = -radius; dx <= radius; dx++) {
-        for (let dy = -radius; dy <= radius; dy++) {
-          const x = cx + dx;
-          const y = cy + dy;
-          const dist = Math.sqrt(dx*dx + dy*dy);
-          
-          if (x >= 0 && x < gridSize && y >= 0 && y < gridSize && dist <= radius) {
-            const strength = Math.exp(-dist*dist / (radius*radius/4));
-            newField[x][y].phase = Math.atan2(dy, dx) + Math.random() * 0.5;
-            newField[x][y].amplitude = strength * (0.8 + Math.random() * 0.4);
-          }
-        }
-      }
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lattice Phase Field Simulator</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      background: #0f0f23;
+      color: #e1e8f0;
+      font-family: system-ui, sans-serif;
     }
-    
-    // Initialize trail buffer
-    const newTrailBuffer = Array(gridSize).fill().map(() => Array(gridSize).fill(0));
-    
-    // Reset all state
-    setField(newField);
-    setTrailBuffer(newTrailBuffer);
-    setTime(0);
-    setComplexity([]);
-    setEntropy([]);
-    setCircuitDepth([]);
-    setEntropySpikes([]);
-    setEnergyHistory([]);
-    setMomentumHistory([]);
-    setFourierSpectrum(null);
-    setCorrelationData([]);
-    setLyapunovExponent(0);
-    setEvolutionHistory([]);
-    setDetectedPatterns({ spirals: [], waves: [], symmetries: [], topologicalCharge: 0 });
-    setPatternHistory([]);
-  }, [settings.gridSize]);
-
-  // Mathematical analysis functions
-  const calculateEnergyMomentum = (field, gridSize) => {
-    let totalEnergy = 0;
-    let totalMomentumX = 0;
-    let totalMomentumY = 0;
-    
-    for (let x = 0; x < gridSize; x++) {
-      for (let y = 0; y < gridSize; y++) {
-        if (!field[x]?.[y]) continue;
-        const cell = field[x][y];
-        
-        // Energy: θ² + A²
-        totalEnergy += cell.phase * cell.phase + cell.amplitude * cell.amplitude;
-        
-        // Momentum: phase gradients weighted by amplitude
-        const neighbors = getNeighbors(x, y, field, gridSize);
-        if (neighbors.length > 0) {
-          let gradX = 0, gradY = 0;
-          neighbors.forEach((neighbor, i) => {
-            const dx = [1, 0, -1, 0][i] || 0;
-            const dy = [0, 1, 0, -1][i] || 0;
-            const phaseDiff = Math.atan2(
-              Math.sin(neighbor.phase - cell.phase), 
-              Math.cos(neighbor.phase - cell.phase)
-            );
-            gradX += phaseDiff * dx;
-            gradY += phaseDiff * dy;
-          });
-          totalMomentumX += gradX * cell.amplitude;
-          totalMomentumY += gradY * cell.amplitude;
-        }
-      }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
     }
-    
-    return {
-      energy: totalEnergy / (gridSize * gridSize),
-      momentum: Math.sqrt(totalMomentumX * totalMomentumX + totalMomentumY * totalMomentumY) / (gridSize * gridSize)
-    };
-  };
-
-  const calculateFourierSpectrum = (field, gridSize) => {
-    if (!field || gridSize < 16) return null;
-    
-    const spectrum = [];
-    const maxK = Math.min(8, gridSize / 4);
-    
-    for (let kx = 0; kx < maxK; kx++) {
-      spectrum[kx] = [];
-      for (let ky = 0; ky < maxK; ky++) {
-        let real = 0, imag = 0;
-        
-        for (let x = 0; x < gridSize; x++) {
-          for (let y = 0; y < gridSize; y++) {
-            const phase = field[x]?.[y]?.phase || 0;
-            const angle = -2 * Math.PI * (kx * x / gridSize + ky * y / gridSize);
-            real += phase * Math.cos(angle);
-            imag += phase * Math.sin(angle);
-          }
-        }
-        
-        spectrum[kx][ky] = Math.sqrt(real * real + imag * imag) / (gridSize * gridSize);
-      }
+    h1 {
+      text-align: center;
+      color: #64ffda;
+      margin-bottom: 30px;
     }
-    
-    return spectrum;
-  };
-
-  const calculateCorrelationFunction = (field, gridSize) => {
-    if (!field) return [];
-    
-    const correlations = [];
-    const maxDistance = Math.min(10, gridSize / 4);
-    
-    for (let r = 1; r <= maxDistance; r++) {
-      let totalCorrelation = 0;
-      let count = 0;
-      
-      for (let x = 0; x < gridSize - r; x++) {
-        for (let y = 0; y < gridSize - r; y++) {
-          const cell1 = field[x]?.[y];
-          const cell2 = field[x + r]?.[y];
-          if (!cell1 || !cell2) continue;
-          
-          const phaseDiff = Math.atan2(
-            Math.sin(cell2.phase - cell1.phase), 
-            Math.cos(cell2.phase - cell1.phase)
-          );
-          const correlation = Math.cos(phaseDiff) * cell1.amplitude * cell2.amplitude;
-          
-          totalCorrelation += correlation;
-          count++;
-        }
-      }
-      
-      correlations.push({
-        distance: r,
-        correlation: count > 0 ? totalCorrelation / count : 0
-      });
+    .main {
+      display: grid;
+      grid-template-columns: 1fr 300px;
+      gap: 20px;
     }
-    
-    return correlations;
-  };
-
-  const estimateLyapunovExponent = (evolutionHistory) => {
-    if (evolutionHistory.length < 10) return 0;
-    
-    const recent = evolutionHistory.slice(-10);
-    let totalDivergence = 0;
-    let count = 0;
-    
-    for (let i = 1; i < recent.length; i++) {
-      const field1 = recent[i - 1];
-      const field2 = recent[i];
-      if (!field1 || !field2) continue;
-      
-      let phaseDivergence = 0;
-      let validCells = 0;
-      
-      for (let x = 0; x < Math.min(field1.length, field2.length); x++) {
-        for (let y = 0; y < Math.min(field1[x]?.length || 0, field2[x]?.length || 0); y++) {
-          const cell1 = field1[x]?.[y];
-          const cell2 = field2[x]?.[y];
-          if (!cell1 || !cell2) continue;
-          
-          const diff = Math.atan2(
-            Math.sin(cell2.phase - cell1.phase),
-            Math.cos(cell2.phase - cell1.phase)
-          );
-          phaseDivergence += Math.abs(diff);
-          validCells++;
-        }
-      }
-      
-      if (validCells > 0) {
-        totalDivergence += Math.log(Math.max(1e-10, phaseDivergence / validCells));
-        count++;
-      }
+    .canvas-container {
+      background: #1a1a2e;
+      padding: 20px;
+      border-radius: 12px;
+      border: 1px solid #444;
     }
-    
-    return count > 0 ? totalDivergence / count : 0;
-  };
-
-  // Pattern Detection Functions
-  const detectSpirals = (field, gridSize) => {
-    const spirals = [];
-    const minRadius = 3;
-    const maxRadius = Math.min(8, gridSize / 4);
-    
-    for (let centerX = maxRadius; centerX < gridSize - maxRadius; centerX += 2) {
-      for (let centerY = maxRadius; centerY < gridSize - maxRadius; centerY += 2) {
-        const center = field[centerX]?.[centerY];
-        if (!center || center.amplitude < 0.3) continue;
-        
-        // Calculate winding number around this point
-        let windingNumber = 0;
-        const numSamples = 16;
-        
-        for (let r = minRadius; r <= maxRadius; r += 2) {
-          let phaseSum = 0;
-          let validSamples = 0;
-          
-          for (let i = 0; i < numSamples; i++) {
-            const angle = (2 * Math.PI * i) / numSamples;
-            const x = Math.round(centerX + r * Math.cos(angle));
-            const y = Math.round(centerY + r * Math.sin(angle));
-            
-            if (x >= 0 && x < gridSize && y >= 0 && y < gridSize) {
-              const cell = field[x]?.[y];
-              if (cell) {
-                const nextI = (i + 1) % numSamples;
-                const nextAngle = (2 * Math.PI * nextI) / numSamples;
-                const nextX = Math.round(centerX + r * Math.cos(nextAngle));
-                const nextY = Math.round(centerY + r * Math.sin(nextAngle));
-                
-                const nextCell = field[nextX]?.[nextY];
-                if (nextCell) {
-                  const phaseDiff = Math.atan2(
-                    Math.sin(nextCell.phase - cell.phase),
-                    Math.cos(nextCell.phase - cell.phase)
-                  );
-                  phaseSum += phaseDiff;
-                  validSamples++;
-                }
-              }
-            }
-          }
-          
-          if (validSamples > numSamples * 0.7) {
-            windingNumber = phaseSum / (2 * Math.PI);
-            if (Math.abs(windingNumber) > 0.3) {
-              spirals.push({
-                x: centerX,
-                y: centerY,
-                radius: r,
-                windingNumber: windingNumber,
-                strength: center.amplitude * Math.abs(windingNumber),
-                clockwise: windingNumber < 0
-              });
-              break; // Found spiral at this location
-            }
-          }
-        }
-      }
+    canvas {
+      width: 100%;
+      height: 600px;
+      border: 1px solid #444;
+      background: #000;
     }
-    
-    // Sort by strength and return top spirals
-    return spirals.sort((a, b) => b.strength - a.strength).slice(0, 10);
-  };
-
-  const detectWaves = (field, gridSize) => {
-    const waves = [];
-    const windowSize = 5;
-    
-    for (let x = windowSize; x < gridSize - windowSize; x += 3) {
-      for (let y = windowSize; y < gridSize - windowSize; y += 3) {
-        // Calculate phase gradient magnitude
-        let gradX = 0, gradY = 0;
-        let validCount = 0;
-        
-        for (let dx = -1; dx <= 1; dx++) {
-          for (let dy = -1; dy <= 1; dy++) {
-            const cell1 = field[x + dx]?.[y + dy];
-            const cell2 = field[x - dx]?.[y - dy];
-            if (cell1 && cell2) {
-              const phaseDiff = Math.atan2(
-                Math.sin(cell1.phase - cell2.phase),
-                Math.cos(cell1.phase - cell2.phase)
-              );
-              gradX += phaseDiff * dx;
-              gradY += phaseDiff * dy;
-              validCount++;
-            }
-          }
-        }
-        
-        if (validCount > 4) {
-          const gradMagnitude = Math.sqrt(gradX * gradX + gradY * gradY);
-          const gradDirection = Math.atan2(gradY, gradX);
-          
-          // Check for wave coherence in surrounding area
-          let coherence = 0;
-          let coherenceCount = 0;
-          
-          for (let dx = -windowSize; dx <= windowSize; dx++) {
-            for (let dy = -windowSize; dy <= windowSize; dy++) {
-              if (dx === 0 && dy === 0) continue;
-              const cell = field[x + dx]?.[y + dy];
-              if (cell) {
-                const expectedPhase = field[x][y]?.phase + gradMagnitude * (dx * Math.cos(gradDirection) + dy * Math.sin(gradDirection));
-                const actualPhase = cell.phase;
-                const phaseDiff = Math.atan2(
-                  Math.sin(actualPhase - expectedPhase),
-                  Math.cos(actualPhase - expectedPhase)
-                );
-                coherence += Math.cos(phaseDiff);
-                coherenceCount++;
-              }
-            }
-          }
-          
-          if (coherenceCount > 0) {
-            coherence /= coherenceCount;
-            
-            if (coherence > 0.6 && gradMagnitude > 0.2) {
-              waves.push({
-                x: x,
-                y: y,
-                direction: gradDirection,
-                wavelength: 2 * Math.PI / gradMagnitude,
-                coherence: coherence,
-                amplitude: field[x][y]?.amplitude || 0
-              });
-            }
-          }
-        }
-      }
+    .controls {
+      background: #1a1a2e;
+      padding: 20px;
+      border-radius: 12px;
+      border: 1px solid #444;
+      height: fit-content;
     }
-    
-    return waves.sort((a, b) => b.coherence - a.coherence).slice(0, 15);
-  };
-
-  const detectSymmetries = (field, gridSize) => {
-    const symmetries = [];
-    const centerX = Math.floor(gridSize / 2);
-    const centerY = Math.floor(gridSize / 2);
-    const maxRadius = Math.min(centerX, centerY) - 2;
-    
-    // Test rotational symmetries
-    for (let fold = 2; fold <= 8; fold++) {
-      let symmetryScore = 0;
-      let sampleCount = 0;
-      
-      for (let r = 2; r < maxRadius; r += 2) {
-        for (let angle = 0; angle < 2 * Math.PI; angle += Math.PI / 8) {
-          const x1 = Math.round(centerX + r * Math.cos(angle));
-          const y1 = Math.round(centerY + r * Math.sin(angle));
-          
-          const rotatedAngle = angle + (2 * Math.PI / fold);
-          const x2 = Math.round(centerX + r * Math.cos(rotatedAngle));
-          const y2 = Math.round(centerY + r * Math.sin(rotatedAngle));
-          
-          const cell1 = field[x1]?.[y1];
-          const cell2 = field[x2]?.[y2];
-          
-          if (cell1 && cell2) {
-            const phaseDiff = Math.atan2(
-              Math.sin(cell2.phase - cell1.phase),
-              Math.cos(cell2.phase - cell1.phase)
-            );
-            const ampDiff = Math.abs(cell2.amplitude - cell1.amplitude);
-            
-            const similarity = Math.cos(phaseDiff) * Math.exp(-ampDiff * 2);
-            symmetryScore += similarity;
-            sampleCount++;
-          }
-        }
-      }
-      
-      if (sampleCount > 0) {
-        const normalizedScore = symmetryScore / sampleCount;
-        if (normalizedScore > 0.3) {
-          symmetries.push({
-            fold: fold,
-            score: normalizedScore,
-            centerX: centerX,
-            centerY: centerY,
-            radius: maxRadius
-          });
-        }
-      }
+    .control-group {
+      margin-bottom: 20px;
     }
-    
-    return symmetries.sort((a, b) => b.score - a.score);
-  };
-
-  const calculateTopologicalCharge = (field, gridSize) => {
-    let totalCharge = 0;
-    
-    for (let x = 1; x < gridSize - 1; x++) {
-      for (let y = 1; y < gridSize - 1; y++) {
-        // Calculate winding number around elementary square
-        const corners = [
-          field[x]?.[y],
-          field[x + 1]?.[y], 
-          field[x + 1]?.[y + 1],
-          field[x]?.[y + 1]
-        ];
-        
-        if (corners.every(c => c)) {
-          let phaseSum = 0;
-          for (let i = 0; i < 4; i++) {
-            const curr = corners[i];
-            const next = corners[(i + 1) % 4];
-            const phaseDiff = Math.atan2(
-              Math.sin(next.phase - curr.phase),
-              Math.cos(next.phase - curr.phase)
-            );
-            phaseSum += phaseDiff;
-          }
-          
-          const localCharge = phaseSum / (2 * Math.PI);
-          if (Math.abs(localCharge) > 0.1) {
-            totalCharge += localCharge;
-          }
-        }
-      }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      color: #b0bec5;
     }
-    
-    return totalCharge;
-  };
-
-  const analyzePatterns = (field, gridSize) => {
-    const spirals = detectSpirals(field, gridSize);
-    const waves = detectWaves(field, gridSize);
-    const symmetries = detectSymmetries(field, gridSize);
-    const topologicalCharge = calculateTopologicalCharge(field, gridSize);
-    
-    return {
-      spirals,
-      waves,
-      symmetries,
-      topologicalCharge,
-      totalPatterns: spirals.length + waves.length + symmetries.length
-    };
-  };
-
-  // Field evolution step
-  const evolveField = (prevField) => {
-    if (!prevField) return null;
-    
-    const { gridSize, diffusionRate, nonlinearStrength, complexityThreshold } = settings;
-    const newField = prevField.map(row => row.map(cell => ({ ...cell })));
-    
-    for (let x = 0; x < gridSize; x++) {
-      for (let y = 0; y < gridSize; y++) {
-        const cell = prevField[x]?.[y];
-        if (!cell) continue;
-        
-        const newCell = newField[x][y];
-        const neighbors = getNeighbors(x, y, prevField, gridSize);
-        
-        // Diffusion
-        if (neighbors.length > 0) {
-          let avgPhaseX = 0, avgPhaseY = 0, avgAmp = 0;
-          neighbors.forEach(n => {
-            avgPhaseX += Math.cos(n.phase) * n.amplitude;
-            avgPhaseY += Math.sin(n.phase) * n.amplitude;
-            avgAmp += n.amplitude;
-          });
-          
-          avgPhaseX /= neighbors.length;
-          avgPhaseY /= neighbors.length;
-          avgAmp /= neighbors.length;
-          
-          const avgPhase = Math.atan2(avgPhaseY, avgPhaseX);
-          const phaseDiff = Math.atan2(
-            Math.sin(avgPhase - cell.phase), 
-            Math.cos(avgPhase - cell.phase)
-          );
-          
-          newCell.phase += diffusionRate * phaseDiff;
-          newCell.amplitude += diffusionRate * (avgAmp - cell.amplitude);
-        }
-        
-        // Nonlinear dynamics
-        const complexityFactor = cell.complexity / (complexityThreshold + cell.complexity);
-        newCell.phase += nonlinearStrength * complexityFactor * Math.sin(cell.phase * 3);
-        
-        // Complexity saturation and reorganization
-        if (cell.complexity > complexityThreshold) {
-          newCell.amplitude *= 0.95;
-          newCell.phase += Math.random() * 0.1 - 0.05;
-        } else {
-          newCell.amplitude *= 1.002;
-        }
-        
-        newCell.amplitude = Math.max(0, Math.min(1, newCell.amplitude));
-      }
+    input[type="range"] {
+      width: 100%;
     }
-    
-    return newField;
-  };
-
-  // Calculate metrics
-  const calculateMetrics = (field) => {
-    if (!field) return { complexity: 0, entropy: 0, circuitDepth: 0 };
-    
-    const { gridSize } = settings;
-    let totalComplexity = 0;
-    let totalEntropy = 0;
-    let circuitSteps = 0;
-    
-    for (let x = 0; x < gridSize; x++) {
-      for (let y = 0; y < gridSize; y++) {
-        const cell = field[x]?.[y];
-        if (!cell) continue;
-        
-        const neighbors = getNeighbors(x, y, field, gridSize);
-        let phaseGradient = 0;
-        let ampGradient = 0;
-        
-        neighbors.forEach(neighbor => {
-          const phaseDiff = Math.atan2(
-            Math.sin(neighbor.phase - cell.phase), 
-            Math.cos(neighbor.phase - cell.phase)
-          );
-          phaseGradient += Math.abs(phaseDiff);
-          ampGradient += Math.abs(cell.amplitude - neighbor.amplitude);
-        });
-        
-        const localComplexity = (phaseGradient + ampGradient) * cell.amplitude;
-        cell.complexity = localComplexity;
-        totalComplexity += localComplexity;
-        
-        if (cell.amplitude > 0) {
-          totalEntropy -= cell.amplitude * Math.log(cell.amplitude + 1e-10);
-        }
-        
-        if (phaseGradient > 0.5) circuitSteps++;
-      }
+    button {
+      background: #64ffda;
+      color: #001b1f;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-right: 10px;
+      margin-bottom: 10px;
     }
-    
-    return {
-      complexity: totalComplexity / (gridSize * gridSize),
-      entropy: totalEntropy / (gridSize * gridSize),
-      circuitDepth: circuitSteps
-    };
-  };
-
-  // Render field
-  const renderField = useCallback((field, canvas) => {
-    if (!field || !canvas) return;
-    
-    const ctx = canvas.getContext('2d');
-    const { gridSize, showGrid, showTrails, showPatterns } = settings;
-    const cellSize = canvas.width / gridSize;
-    
-    if (!showTrails) {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    .metrics {
+      background: #1a1a2e;
+      padding: 20px;
+      margin-top: 20px;
+      border-radius: 12px;
+      border: 1px solid #444;
     }
-    
-    // Draw trails
-    if (showTrails && trailBuffer) {
-      for (let x = 0; x < gridSize; x++) {
-        for (let y = 0; y < gridSize; y++) {
-          const trailIntensity = trailBuffer[x]?.[y] || 0;
-          if (trailIntensity > 0.1) {
-            ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(0.3, trailIntensity * 0.2)})`;
-            ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
-          }
-        }
-      }
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 15px;
     }
-    
-    // Draw field
-    for (let x = 0; x < gridSize; x++) {
-      for (let y = 0; y < gridSize; y++) {
-        const cell = field[x]?.[y];
-        if (!cell) continue;
-        
-        const hue = (cell.phase / (2 * Math.PI)) * 360;
-        const saturation = Math.min(100, cell.complexity * 200);
-        const lightness = 30 + cell.amplitude * 50;
-        const alpha = showTrails ? 0.8 : 1.0;
-        
-        ctx.fillStyle = `hsla(${hue}, ${saturation}%, ${lightness}%, ${alpha})`;
-        ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
-        
-        // Grid
-        if (showGrid) {
-          ctx.strokeStyle = 'rgba(255,255,255,0.05)';
-          ctx.lineWidth = 0.5;
-          ctx.strokeRect(x * cellSize, y * cellSize, cellSize, cellSize);
-        }
-        
-        // High complexity regions
-        if (cell.complexity > settings.complexityThreshold) {
-          ctx.strokeStyle = showTrails ? 'rgba(255,255,255,0.9)' : 'white';
-          ctx.lineWidth = 1;
-          ctx.strokeRect(x * cellSize, y * cellSize, cellSize, cellSize);
-        }
-      }
+    .metric-item {
+      text-align: center;
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 6px;
     }
-    
-    // Overlay detected patterns
-    if (showPatterns && detectedPatterns) {
-      // Draw spirals
-      detectedPatterns.spirals?.forEach(spiral => {
-        const centerX = spiral.x * cellSize + cellSize / 2;
-        const centerY = spiral.y * cellSize + cellSize / 2;
-        const radius = spiral.radius * cellSize;
-        
-        ctx.beginPath();
-        ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
-        ctx.strokeStyle = spiral.clockwise ? '#ff4444' : '#44ff44';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        
-        // Draw arrow indicating rotation
-        const arrowAngle = spiral.clockwise ? Math.PI / 4 : -Math.PI / 4;
-        const arrowX = centerX + radius * 0.7 * Math.cos(arrowAngle);
-        const arrowY = centerY + radius * 0.7 * Math.sin(arrowAngle);
-        
-        ctx.beginPath();
-        ctx.moveTo(arrowX, arrowY);
-        ctx.lineTo(arrowX - 8 * Math.cos(arrowAngle + 0.5), arrowY - 8 * Math.sin(arrowAngle + 0.5));
-        ctx.lineTo(arrowX - 8 * Math.cos(arrowAngle - 0.5), arrowY - 8 * Math.sin(arrowAngle - 0.5));
-        ctx.closePath();
-        ctx.fillStyle = spiral.clockwise ? '#ff4444' : '#44ff44';
-        ctx.fill();
-      });
-      
-      // Draw waves
-      detectedPatterns.waves?.forEach(wave => {
-        const centerX = wave.x * cellSize + cellSize / 2;
-        const centerY = wave.y * cellSize + cellSize / 2;
-        const waveLength = 20;
-        
-        // Draw wave direction arrow
-        const endX = centerX + waveLength * Math.cos(wave.direction);
-        const endY = centerY + waveLength * Math.sin(wave.direction);
-        
-        ctx.beginPath();
-        ctx.moveTo(centerX, centerY);
-        ctx.lineTo(endX, endY);
-        ctx.strokeStyle = '#44aaff';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        
-        // Arrow head
-        ctx.beginPath();
-        ctx.moveTo(endX, endY);
-        ctx.lineTo(endX - 8 * Math.cos(wave.direction - 0.5), endY - 8 * Math.sin(wave.direction - 0.5));
-        ctx.lineTo(endX - 8 * Math.cos(wave.direction + 0.5), endY - 8 * Math.sin(wave.direction + 0.5));
-        ctx.closePath();
-        ctx.fillStyle = '#44aaff';
-        ctx.fill();
-      });
-      
-      // Draw symmetry centers
-      detectedPatterns.symmetries?.forEach(symmetry => {
-        const centerX = symmetry.centerX * cellSize + cellSize / 2;
-        const centerY = symmetry.centerY * cellSize + cellSize / 2;
-        
-        // Draw symmetry indicator
-        ctx.beginPath();
-        for (let i = 0; i < symmetry.fold; i++) {
-          const angle = (2 * Math.PI * i) / symmetry.fold;
-          const x = centerX + 15 * Math.cos(angle);
-          const y = centerY + 15 * Math.sin(angle);
-          
-          if (i === 0) {
-            ctx.moveTo(x, y);
-          } else {
-            ctx.lineTo(x, y);
-          }
-        }
-        ctx.closePath();
-        ctx.strokeStyle = '#ffaa44';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        
-        // Center dot
-        ctx.beginPath();
-        ctx.arc(centerX, centerY, 3, 0, 2 * Math.PI);
-        ctx.fillStyle = '#ffaa44';
-        ctx.fill();
-      });
+    .metric-value {
+      font-size: 1.5rem;
+      font-weight: bold;
+      color: #64ffda;
     }
-  }, [settings, trailBuffer, detectedPatterns]);
-
-  // Animation loop
-  useEffect(() => {
-    if (!isRunning || !field) return;
-    
-    let animationId;
-    
-    const animate = () => {
-      setField(prevField => {
-        if (!prevField) return prevField;
-        
-        // Evolve field
-        const newField = evolveField(prevField);
-        if (!newField) return prevField;
-        
-        // Update trails
-        if (settings.showTrails) {
-          setTrailBuffer(prevTrails => {
-            if (!prevTrails) return prevTrails;
-            
-            const newTrails = prevTrails.map(row => 
-              row.map(val => val * settings.trailDecay)
-            );
-            
-            for (let x = 0; x < settings.gridSize; x++) {
-              for (let y = 0; y < settings.gridSize; y++) {
-                const cell = newField[x]?.[y];
-                if (cell) {
-                  const intensity = cell.amplitude * (1 + cell.complexity);
-                  newTrails[x][y] = Math.max(newTrails[x][y], intensity);
-                }
-              }
-            }
-            
-            return newTrails;
-          });
-        }
-        
-        // Calculate metrics
-        const metrics = calculateMetrics(newField);
-        
-        // Update time and metrics
-        setTime(t => t + 1);
-        setComplexity(prev => [...prev.slice(-200), metrics.complexity]);
-        setEntropy(prev => [...prev.slice(-200), metrics.entropy]);
-        setCircuitDepth(prev => [...prev.slice(-200), metrics.circuitDepth]);
-        
-        // Entropy spike detection
-        setEntropy(prevEntropy => {
-          const lastEntropy = prevEntropy[prevEntropy.length - 1] || 0;
-          const entropyJump = Math.abs(metrics.entropy - lastEntropy);
-          
-          if (entropyJump > 0.1 && prevEntropy.length > 5) {
-            setEntropySpikes(prevSpikes => {
-              const newSpikes = [...prevSpikes, {
-                time: time + 1,
-                magnitude: entropyJump,
-                entropy: metrics.entropy
-              }];
-              return newSpikes.filter(spike => (time + 1) - spike.time < 50);
-            });
-          }
-          
-          return [...prevEntropy.slice(-200), metrics.entropy];
-        });
-        
-        // Mathematical analysis
-        if (settings.enableAnalysis) {
-          // Store evolution history
-          setEvolutionHistory(prev => [...prev.slice(-20), newField]);
-          
-          // Energy and momentum
-          const energyMomentum = calculateEnergyMomentum(newField, settings.gridSize);
-          setEnergyHistory(prev => [...prev.slice(-200), energyMomentum.energy]);
-          setMomentumHistory(prev => [...prev.slice(-200), energyMomentum.momentum]);
-          
-          // Fourier analysis (every 5 steps)
-          if ((time + 1) % 5 === 0) {
-            const spectrum = calculateFourierSpectrum(newField, settings.gridSize);
-            setFourierSpectrum(spectrum);
-          }
-          
-          // Correlation function (every 10 steps)
-          if ((time + 1) % 10 === 0) {
-            const correlations = calculateCorrelationFunction(newField, settings.gridSize);
-            setCorrelationData(correlations);
-          }
-          
-          // Update Lyapunov exponent
-          setEvolutionHistory(currentHistory => {
-            const lyapunov = estimateLyapunovExponent(currentHistory);
-            setLyapunovExponent(lyapunov);
-            return currentHistory;
-          });
-          
-          // Pattern detection (every 15 steps for performance)
-          if ((time + 1) % 15 === 0) {
-            const patterns = analyzePatterns(newField, settings.gridSize);
-            setDetectedPatterns(patterns);
-            setPatternHistory(prev => [...prev.slice(-50), {
-              time: time + 1,
-              totalPatterns: patterns.totalPatterns,
-              spiralCount: patterns.spirals.length,
-              waveCount: patterns.waves.length,
-              symmetryCount: patterns.symmetries.length,
-              topologicalCharge: patterns.topologicalCharge
-            }]);
-          }
-        }
-        
-        return newField;
-      });
-      
-      if (isRunning) {
-        animationId = requestAnimationFrame(animate);
-      }
-    };
-    
-    animationId = requestAnimationFrame(animate);
-    
-    return () => {
-      if (animationId) {
-        cancelAnimationFrame(animationId);
-      }
-    };
-  }, [isRunning, field, settings, time]);
-
-  // Rendering effect
-  useEffect(() => {
-    if (field && canvasRef.current) {
-      renderField(field, canvasRef.current);
+    .metric-label {
+      font-size: 0.8rem;
+      color: #b0bec5;
     }
-  }, [field, renderField]);
-
-  // Initialize on mount
-  useEffect(() => {
-    initializeField();
-  }, [initializeField]);
-
-  // Chart component
-  const MetricChart = ({ data, label, color, maxY }) => {
-    const safeData = Array.isArray(data) ? data.filter(v => typeof v === 'number' && isFinite(v)) : [];
-    const safeMaxY = typeof maxY === 'number' && isFinite(maxY) && maxY > 0 ? maxY : 1;
-    const currentValue = safeData[safeData.length - 1] || 0;
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🌊 Lattice Phase Field Simulator</h1>
     
-    return (
-      <div className="bg-gray-800 rounded p-3 h-32">
-        <div className="text-xs text-gray-300 mb-2">{label}</div>
-        <svg width="100%" height="80" className="overflow-visible">
-          {safeData.length > 1 && (
-            <polyline
-              fill="none"
-              stroke={color}
-              strokeWidth="1.5"
-              points={safeData.map((val, i) => {
-                const x = (i / Math.max(1, safeData.length - 1)) * 100;
-                const y = Math.max(0, Math.min(80, 80 - (val / safeMaxY) * 80));
-                return `${x},${y}`;
-              }).join(' ')}
-            />
-          )}
-          <text x="2" y="12" fill={color} fontSize="10">
-            {currentValue.toFixed(3)}
-          </text>
-        </svg>
-      </div>
-    );
-  };
-
-  return (
-    <div className="w-full max-w-6xl mx-auto p-6 bg-black text-white">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-2">Quantum Complexity in Symbolic Systems</h1>
-        <p className="text-gray-300 text-sm">
-          Mathematical physics analysis of symbolic field evolution and quantum circuit complexity analogies
-        </p>
+    <div class="main">
+      <div class="canvas-container">
+        <canvas id="canvas" width="800" height="600"></canvas>
       </div>
       
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main visualization */}
-        <div className="lg:col-span-2">
-          <div className="bg-gray-900 rounded-lg p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">Symbolic Field Evolution</h2>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setIsRunning(!isRunning)}
-                  className="flex items-center gap-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm"
-                >
-                  {isRunning ? <Pause size={16} /> : <Play size={16} />}
-                  {isRunning ? 'Pause' : 'Play'}
-                </button>
-                <button
-                  onClick={initializeField}
-                  className="flex items-center gap-2 px-3 py-1 bg-gray-600 hover:bg-gray-700 rounded text-sm"
-                >
-                  <RotateCcw size={16} />
-                  Reset
-                </button>
-              </div>
-            </div>
-            
-            <canvas 
-              ref={canvasRef}
-              width={512}
-              height={512}
-              className="w-full border border-gray-700 rounded"
-            />
-            
-            <div className="mt-2 text-xs text-gray-400">
-              <p>Color: Phase | Brightness: Amplitude | White borders: High complexity regions</p>
-              <p>🌀 Red/Green circles: Spirals | 〰️ Blue arrows: Waves | ⚡ Yellow polygons: Symmetries</p>
-              <p>Time: {time} steps</p>
-            </div>
-          </div>
+      <div class="controls">
+        <div class="control-group">
+          <button id="playBtn">▶️ Play</button>
+          <button id="pauseBtn">⏸️ Pause</button>
+          <button id="resetBtn">🔄 Reset</button>
         </div>
         
-        {/* Metrics and controls */}
-        <div className="space-y-4">
-          {/* Core metrics */}
-          <div className="space-y-3">
-            <MetricChart 
-              data={complexity} 
-              label="Symbolic Complexity" 
-              color="#ff6b6b" 
-              maxY={complexity.length > 0 ? Math.max(0.1, ...complexity) * 1.1 : 1}
-            />
-            <MetricChart 
-              data={entropy} 
-              label="Phase Entropy" 
-              color="#4ecdc4" 
-              maxY={entropy.length > 0 ? Math.max(0.1, ...entropy) * 1.1 : 1}
-            />
-            <MetricChart 
-              data={circuitDepth} 
-              label="Circuit Depth Analog" 
-              color="#45b7d1" 
-              maxY={circuitDepth.length > 0 ? Math.max(10, ...circuitDepth) * 1.1 : 100}
-            />
-          </div>
-          
-          {/* Analysis panels */}
-          {settings.enableAnalysis && (
-            <>
-              {settings.analysisMode === 'energy' && (
-                <>
-                  <MetricChart 
-                    data={energyHistory} 
-                    label="Energy Conservation" 
-                    color="#ffd700" 
-                    maxY={energyHistory.length > 0 ? Math.max(0.1, ...energyHistory) * 1.1 : 1}
-                  />
-                  <MetricChart 
-                    data={momentumHistory} 
-                    label="Momentum Conservation" 
-                    color="#ff6b6b" 
-                    maxY={momentumHistory.length > 0 ? Math.max(0.1, ...momentumHistory) * 1.1 : 1}
-                  />
-                </>
-              )}
-              
-              {settings.analysisMode === 'lyapunov' && (
-                <div className="bg-gray-800 rounded p-3 h-32">
-                  <div className="text-xs text-gray-300 mb-2">Chaos Analysis</div>
-                  <div className="text-center pt-6">
-                    <div className="text-2xl font-mono text-orange-400">
-                      λ = {lyapunovExponent.toFixed(4)}
-                    </div>
-                    <div className="text-xs text-gray-400 mt-2">
-                      {lyapunovExponent > 0 ? 'Chaotic' : lyapunovExponent < 0 ? 'Stable' : 'Neutral'}
-                    </div>
-                    <div className="text-xs text-gray-500 mt-1">
-                      Lyapunov Exponent
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              {settings.analysisMode === 'fourier' && fourierSpectrum && (
-                <div className="bg-gray-800 rounded p-3 h-32">
-                  <div className="text-xs text-gray-300 mb-2">Fourier Spectrum</div>
-                  <div className="grid grid-cols-8 gap-px h-20">
-                    {fourierSpectrum.map((row, x) => 
-                      row.map((val, y) => (
-                        <div 
-                          key={`${x}-${y}`}
-                          className="bg-blue-500"
-                          style={{ 
-                            opacity: Math.min(1, val * 10),
-                            backgroundColor: `hsl(240, 100%, ${30 + val * 500}%)`
-                          }}
-                        />
-                      ))
-                    )}
-                  </div>
-                  <div className="text-xs text-gray-400 mt-1">
-                    Peak: {fourierSpectrum.flat().reduce((max, val) => Math.max(max, val), 0).toFixed(4)}
-                  </div>
-                </div>
-              )}
-              
-              {settings.analysisMode === 'correlation' && (
-                <div className="bg-gray-800 rounded p-3 h-32">
-                  <div className="text-xs text-gray-300 mb-2">Spatial Correlation</div>
-                  <svg width="100%" height="80" className="overflow-visible">
-                    {correlationData.length > 1 && (
-                      <polyline
-                        fill="none"
-                        stroke="#00ff88"
-                        strokeWidth="1.5"
-                        points={correlationData.map((item, i) => {
-                          const x = (i / Math.max(1, correlationData.length - 1)) * 100;
-                          const y = 40 + item.correlation * 30;
-                          return `${x},${y}`;
-                        }).join(' ')}
-                      />
-                    )}
-                    <line x1="0" y1="40" x2="100" y2="40" stroke="rgba(255,255,255,0.2)" strokeWidth="0.5" />
-                    <text x="2" y="12" fill="#00ff88" fontSize="10">
-                      C(1): {correlationData[0]?.correlation.toFixed(3) || '0.000'}
-                    </text>
-                  </svg>
-                </div>
-              )}
-              
-              {settings.analysisMode === 'patterns' && (
-                <>
-                  <div className="bg-gray-800 rounded p-3 h-32">
-                    <div className="text-xs text-gray-300 mb-2">Pattern Detection</div>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div>
-                        <div className="text-red-400">🌀 Spirals: {detectedPatterns.spirals?.length || 0}</div>
-                        <div className="text-blue-400">〰️ Waves: {detectedPatterns.waves?.length || 0}</div>
-                      </div>
-                      <div>
-                        <div className="text-yellow-400">⚡ Symmetries: {detectedPatterns.symmetries?.length || 0}</div>
-                        <div className="text-purple-400">Q: {detectedPatterns.topologicalCharge?.toFixed(2) || '0.00'}</div>
-                      </div>
-                    </div>
-                    <div className="mt-2 text-xs text-gray-400">
-                      <div>Total Patterns: {detectedPatterns.totalPatterns || 0}</div>
-                      {detectedPatterns.spirals?.[0] && (
-                        <div>Strongest Spiral: {detectedPatterns.spirals[0].windingNumber.toFixed(2)}</div>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div className="bg-gray-800 rounded p-3 h-32">
-                    <div className="text-xs text-gray-300 mb-2">Pattern Evolution</div>
-                    <svg width="100%" height="80" className="overflow-visible">
-                      {patternHistory.length > 1 && (
-                        <>
-                          <polyline
-                            fill="none"
-                            stroke="#ff6b6b"
-                            strokeWidth="1"
-                            points={patternHistory.map((item, i) => {
-                              const x = (i / Math.max(1, patternHistory.length - 1)) * 100;
-                              const y = 80 - (item.spiralCount / Math.max(1, Math.max(...patternHistory.map(p => p.spiralCount))) * 80);
-                              return `${x},${y}`;
-                            }).join(' ')}
-                          />
-                          <polyline
-                            fill="none"
-                            stroke="#44aaff"
-                            strokeWidth="1"
-                            points={patternHistory.map((item, i) => {
-                              const x = (i / Math.max(1, patternHistory.length - 1)) * 100;
-                              const y = 80 - (item.waveCount / Math.max(1, Math.max(...patternHistory.map(p => p.waveCount))) * 80);
-                              return `${x},${y}`;
-                            }).join(' ')}
-                          />
-                          <polyline
-                            fill="none"
-                            stroke="#ffaa44"
-                            strokeWidth="1"
-                            points={patternHistory.map((item, i) => {
-                              const x = (i / Math.max(1, patternHistory.length - 1)) * 100;
-                              const y = 80 - (item.symmetryCount / Math.max(1, Math.max(...patternHistory.map(p => p.symmetryCount))) * 80);
-                              return `${x},${y}`;
-                            }).join(' ')}
-                          />
-                        </>
-                      )}
-                      <text x="2" y="12" fill="#ff6b6b" fontSize="9">Spirals</text>
-                      <text x="2" y="24" fill="#44aaff" fontSize="9">Waves</text>
-                      <text x="2" y="36" fill="#ffaa44" fontSize="9">Symmetries</text>
-                    </svg>
-                  </div>
-                </>
-              )}
-                <div className="bg-gray-800 rounded p-3 h-32">
-                  <div className="text-xs text-gray-300 mb-2">Chaos Analysis</div>
-                  <div className="text-center pt-6">
-                    <div className="text-2xl font-mono text-orange-400">
-                      λ = {lyapunovExponent.toFixed(4)}
-                    </div>
-                    <div className="text-xs text-gray-400 mt-2">
-                      {lyapunovExponent > 0 ? 'Chaotic' : lyapunovExponent < 0 ? 'Stable' : 'Neutral'}
-                    </div>
-                    <div className="text-xs text-gray-500 mt-1">
-                      Lyapunov Exponent
-                    </div>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-          
-          {/* Entropy spikes */}
-          <div className="bg-gray-800 rounded p-3 h-32">
-            <div className="text-xs text-gray-300 mb-2">Entropy Spikes (Info Events)</div>
-            <div className="h-20 overflow-y-auto text-xs">
-              {entropySpikes.length === 0 ? (
-                <div className="text-gray-500">No significant entropy events detected</div>
-              ) : (
-                entropySpikes.slice(-5).reverse().map((spike, i) => (
-                  <div key={i} className="mb-1 text-yellow-400">
-                    <span className="text-gray-400">t={spike.time}:</span> Δ{spike.magnitude.toFixed(3)} 
-                    <span className="text-xs text-gray-500 ml-1">({spike.entropy.toFixed(3)})</span>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-          
-          {/* Controls */}
-          <div className="bg-gray-900 rounded-lg p-4">
-            <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-              <Settings size={18} />
-              Parameters
-            </h3>
-            
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs text-gray-400 mb-1">Grid Size</label>
-                <input
-                  type="range"
-                  min="32"
-                  max="128"
-                  step="16"
-                  value={settings.gridSize}
-                  onChange={(e) => setSettings(s => ({ ...s, gridSize: parseInt(e.target.value) }))}
-                  className="w-full"
-                />
-                <span className="text-xs text-gray-500">{settings.gridSize}</span>
-              </div>
-              
-              <div>
-                <label className="block text-xs text-gray-400 mb-1">Diffusion Rate</label>
-                <input
-                  type="range"
-                  min="0.01"
-                  max="0.5"
-                  step="0.01"
-                  value={settings.diffusionRate}
-                  onChange={(e) => setSettings(s => ({ ...s, diffusionRate: parseFloat(e.target.value) }))}
-                  className="w-full"
-                />
-                <span className="text-xs text-gray-500">{settings.diffusionRate}</span>
-              </div>
-              
-              <div>
-                <label className="block text-xs text-gray-400 mb-1">Nonlinear Strength</label>
-                <input
-                  type="range"
-                  min="0"
-                  max="2"
-                  step="0.1"
-                  value={settings.nonlinearStrength}
-                  onChange={(e) => setSettings(s => ({ ...s, nonlinearStrength: parseFloat(e.target.value) }))}
-                  className="w-full"
-                />
-                <span className="text-xs text-gray-500">{settings.nonlinearStrength}</span>
-              </div>
-              
-              <div>
-                <label className="block text-xs text-gray-400 mb-1">Complexity Threshold</label>
-                <input
-                  type="range"
-                  min="0.1"
-                  max="2"
-                  step="0.1"
-                  value={settings.complexityThreshold}
-                  onChange={(e) => setSettings(s => ({ ...s, complexityThreshold: parseFloat(e.target.value) }))}
-                  className="w-full"
-                />
-                <span className="text-xs text-gray-500">{settings.complexityThreshold}</span>
-              </div>
-              
-              <div>
-                <label className="flex items-center gap-2 text-xs text-gray-400">
-                  <input
-                    type="checkbox"
-                    checked={settings.showGrid}
-                    onChange={(e) => setSettings(s => ({ ...s, showGrid: e.target.checked }))}
-                    className="rounded"
-                  />
-                  Show Grid Overlay
-                </label>
-              </div>
-              
-              <div>
-                <label className="flex items-center gap-2 text-xs text-gray-400">
-                  <input
-                    type="checkbox"
-                    checked={settings.showTrails}
-                    onChange={(e) => setSettings(s => ({ ...s, showTrails: e.target.checked }))}
-                    className="rounded"
-                  />
-                  Show Motion Trails
-                </label>
-              </div>
-              
-              <div>
-                <label className="flex items-center gap-2 text-xs text-gray-400">
-                  <input
-                    type="checkbox"
-                    checked={settings.showPatterns}
-                    onChange={(e) => setSettings(s => ({ ...s, showPatterns: e.target.checked }))}
-                    className="rounded"
-                  />
-                  Show Pattern Overlays
-                </label>
-              </div>
-              
-              {settings.showTrails && (
-                <div>
-                  <label className="block text-xs text-gray-400 mb-1">Trail Decay Rate</label>
-                  <input
-                    type="range"
-                    min="0.8"
-                    max="0.99"
-                    step="0.01"
-                    value={settings.trailDecay}
-                    onChange={(e) => setSettings(s => ({ ...s, trailDecay: parseFloat(e.target.value) }))}
-                    className="w-full"
-                  />
-                  <span className="text-xs text-gray-500">{settings.trailDecay}</span>
-                </div>
-              )}
-              
-              <div className="border-t border-gray-700 pt-3">
-                <label className="flex items-center gap-2 text-xs text-gray-400 mb-2">
-                  <input
-                    type="checkbox"
-                    checked={settings.enableAnalysis}
-                    onChange={(e) => setSettings(s => ({ ...s, enableAnalysis: e.target.checked }))}
-                    className="rounded"
-                  />
-                  Enable Mathematical Analysis
-                </label>
-                
-                {settings.enableAnalysis && (
-                  <div>
-                    <label className="block text-xs text-gray-400 mb-1">Analysis Mode</label>
-                    <select
-                      value={settings.analysisMode}
-                      onChange={(e) => setSettings(s => ({ ...s, analysisMode: e.target.value }))}
-                      className="w-full bg-gray-700 text-white text-xs p-1 rounded"
-                    >
-                      <option value="energy">Energy Conservation</option>
-                      <option value="fourier">Fourier Spectrum</option>
-                      <option value="correlation">Spatial Correlation</option>
-                      <option value="lyapunov">Chaos Analysis</option>
-                      <option value="patterns">Pattern Detection</option>
-                    </select>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-          
-          {/* Mathematical physics info */}
-          <div className="bg-gray-900 rounded-lg p-4">
-            <h3 className="text-lg font-semibold mb-3">Mathematical Physics Analysis</h3>
-            <div className="text-xs text-gray-300 space-y-2">
-              <p><strong>Energy Conservation:</strong> Tracks ∫(θ² + A²)dx - tests if symbolic field energy is conserved</p>
-              <p><strong>Momentum Conservation:</strong> Monitors ∇θ weighted by amplitude - symbolic momentum analog</p>
-              <p><strong>Fourier Analysis:</strong> 2D DFT of phase field reveals frequency structure and wave modes</p>
-              <p><strong>Spatial Correlation:</strong> C(r) = ⟨cos(θ(x) - θ(x+r))⟩ - measures phase coherence length</p>
-              <p><strong>Lyapunov Exponent:</strong> λ > 0 indicates chaotic dynamics, λ ≤ 0 suggests deterministic structure</p>
-              <p><strong>Pattern Detection:</strong> Automatically identifies spirals, waves, symmetries, and topological charges</p>
-              <p><strong>🌀 Spirals:</strong> Detected via winding number calculation around potential vortex centers</p>
-              <p><strong>〰️ Waves:</strong> Found by analyzing phase gradient coherence and directional propagation</p>
-              <p><strong>⚡ Symmetries:</strong> Rotational symmetries detected by comparing field values at rotated positions</p>
-              <p><strong>Q (Topological Charge):</strong> Sum of winding numbers - conserved topological invariant</p>
-            </div>
-          </div>
+        <div class="control-group">
+          <label for="gridSize">Grid Size: <span id="gridSizeVal">64</span></label>
+          <input type="range" id="gridSize" min="32" max="128" value="64" step="8">
+        </div>
+        
+        <div class="control-group">
+          <label for="diffusionRate">Diffusion Rate: <span id="diffusionRateVal">0.1</span></label>
+          <input type="range" id="diffusionRate" min="0.01" max="0.5" value="0.1" step="0.01">
+        </div>
+        
+        <div class="control-group">
+          <label for="nonlinearStrength">Nonlinear Strength: <span id="nonlinearStrengthVal">0.8</span></label>
+          <input type="range" id="nonlinearStrength" min="0.1" max="2.0" value="0.8" step="0.1">
+        </div>
+        
+        <div class="control-group">
+          <label><input type="checkbox" id="showGrid"> Show Grid</label>
+          <label><input type="checkbox" id="showTrails"> Show Trails</label>
         </div>
       </div>
     </div>
-  );
-};
+    
+    <div class="metrics">
+      <div class="metric-grid">
+        <div class="metric-item">
+          <div class="metric-value" id="complexityVal">0.000</div>
+          <div class="metric-label">Complexity</div>
+        </div>
+        <div class="metric-item">
+          <div class="metric-value" id="entropyVal">0.000</div>
+          <div class="metric-label">Entropy</div>
+        </div>
+        <div class="metric-item">
+          <div class="metric-value" id="energyVal">0.000</div>
+          <div class="metric-label">Energy</div>
+        </div>
+        <div class="metric-item">
+          <div class="metric-value" id="timeVal">0.000</div>
+          <div class="metric-label">Time</div>
+        </div>
+      </div>
+    </div>
+  </div>
 
-export default QuantumSymbolicComplexity;
+  <script>
+    class LatticePhaseFieldSim {
+      constructor() {
+        this.canvas = document.getElementById('canvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.isRunning = false;
+        this.time = 0;
+        
+        this.settings = {
+          gridSize: 64,
+          diffusionRate: 0.1,
+          nonlinearStrength: 0.8,
+          showGrid: false,
+          showTrails: false
+        };
+        
+        this.field = null;
+        this.trailBuffer = null;
+        
+        this.initializeField();
+        this.bindControls();
+        this.render();
+      }
+      
+      initializeField() {
+        const { gridSize } = this.settings;
+        
+        this.field = Array(gridSize).fill().map(() => 
+          Array(gridSize).fill().map(() => ({
+            phase: Math.random() * 2 * Math.PI,
+            amplitude: Math.random() * 0.5 + 0.1
+          }))
+        );
+        
+        // Add coherent structures
+        for (let i = 0; i < 3; i++) {
+          const cx = Math.floor(Math.random() * gridSize);
+          const cy = Math.floor(Math.random() * gridSize);
+          const radius = Math.floor(8 + Math.random() * 12);
+          
+          for (let dx = -radius; dx <= radius; dx++) {
+            for (let dy = -radius; dy <= radius; dy++) {
+              const x = cx + dx;
+              const y = cy + dy;
+              const dist = Math.sqrt(dx*dx + dy*dy);
+              
+              if (x >= 0 && x < gridSize && y >= 0 && y < gridSize && dist <= radius) {
+                const strength = Math.exp(-dist*dist / (radius*radius/4));
+                this.field[x][y].phase = Math.atan2(dy, dx) + Math.random() * 0.5;
+                this.field[x][y].amplitude = strength * (0.8 + Math.random() * 0.4);
+              }
+            }
+          }
+        }
+        
+        this.trailBuffer = Array(gridSize).fill().map(() => Array(gridSize).fill(0));
+      }
+      
+      step() {
+        const { gridSize, diffusionRate, nonlinearStrength } = this.settings;
+        const newField = Array(gridSize).fill().map(() => 
+          Array(gridSize).fill().map(() => ({ phase: 0, amplitude: 0 }))
+        );
+        
+        for (let x = 0; x < gridSize; x++) {
+          for (let y = 0; y < gridSize; y++) {
+            const current = this.field[x][y];
+            
+            // Get neighbors
+            const neighbors = [
+              this.field[(x+1) % gridSize]?.[y],
+              this.field[x]?.[(y+1) % gridSize],
+              this.field[(x-1+gridSize) % gridSize]?.[y],
+              this.field[x]?.[(y-1+gridSize) % gridSize]
+            ].filter(Boolean);
+            
+            // Diffusion
+            let avgPhase = 0;
+            let avgAmplitude = 0;
+            neighbors.forEach(n => {
+              avgPhase += n.phase;
+              avgAmplitude += n.amplitude;
+            });
+            avgPhase /= neighbors.length;
+            avgAmplitude /= neighbors.length;
+            
+            // Nonlinear coupling
+            const coupling = Math.sin(current.phase - avgPhase) * current.amplitude * nonlinearStrength;
+            
+            // Update
+            newField[x][y].phase = current.phase + diffusionRate * (avgPhase - current.phase) + coupling * 0.01;
+            newField[x][y].amplitude = current.amplitude + diffusionRate * (avgAmplitude - current.amplitude);
+            newField[x][y].amplitude = Math.max(0.01, Math.min(1.0, newField[x][y].amplitude));
+            
+            // Update trails
+            if (this.settings.showTrails) {
+              this.trailBuffer[x][y] = this.trailBuffer[x][y] * 0.95 + current.amplitude * 0.05;
+            }
+          }
+        }
+        
+        this.field = newField;
+        this.time += 0.01;
+        this.updateMetrics();
+      }
+      
+      updateMetrics() {
+        const { gridSize } = this.settings;
+        let totalEnergy = 0;
+        let totalAmplitude = 0;
+        let amplitudeHist = Array(10).fill(0);
+        
+        for (let x = 0; x < gridSize; x++) {
+          for (let y = 0; y < gridSize; y++) {
+            const cell = this.field[x][y];
+            totalEnergy += cell.amplitude * cell.amplitude;
+            totalAmplitude += cell.amplitude;
+            
+            const bin = Math.floor(cell.amplitude * 10);
+            if (bin < 10) amplitudeHist[bin]++;
+          }
+        }
+        
+        const energy = totalEnergy / (gridSize * gridSize);
+        
+        // Calculate entropy
+        const total = amplitudeHist.reduce((a, b) => a + b, 0);
+        const entropy = amplitudeHist.reduce((sum, count) => {
+          if (count > 0) {
+            const p = count / total;
+            return sum - p * Math.log(p);
+          }
+          return sum;
+        }, 0);
+        
+        const complexity = entropy * energy;
+        
+        document.getElementById('complexityVal').textContent = complexity.toFixed(3);
+        document.getElementById('entropyVal').textContent = entropy.toFixed(3);
+        document.getElementById('energyVal').textContent = energy.toFixed(3);
+        document.getElementById('timeVal').textContent = this.time.toFixed(2);
+      }
+      
+      render() {
+        const { gridSize, showGrid, showTrails } = this.settings;
+        const cellSize = this.canvas.width / gridSize;
+        
+        this.ctx.fillStyle = '#000';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        for (let x = 0; x < gridSize; x++) {
+          for (let y = 0; y < gridSize; y++) {
+            const cell = this.field[x][y];
+            const trail = this.trailBuffer[x][y];
+            
+            const hue = (cell.phase / (2 * Math.PI)) * 360;
+            const saturation = 80;
+            const lightness = Math.min(90, 20 + cell.amplitude * 70);
+            
+            this.ctx.fillStyle = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+            
+            const px = x * cellSize;
+            const py = y * cellSize;
+            
+            this.ctx.fillRect(px, py, cellSize, cellSize);
+            
+            if (showTrails && trail > 0.01) {
+              this.ctx.fillStyle = `rgba(255, 255, 255, ${trail * 0.3})`;
+              this.ctx.fillRect(px, py, cellSize, cellSize);
+            }
+          }
+        }
+        
+        if (showGrid) {
+          this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+          this.ctx.lineWidth = 1;
+          
+          for (let x = 0; x <= gridSize; x++) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(x * cellSize, 0);
+            this.ctx.lineTo(x * cellSize, this.canvas.height);
+            this.ctx.stroke();
+          }
+          
+          for (let y = 0; y <= gridSize; y++) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(0, y * cellSize);
+            this.ctx.lineTo(this.canvas.width, y * cellSize);
+            this.ctx.stroke();
+          }
+        }
+      }
+      
+      bindControls() {
+        document.getElementById('playBtn').onclick = () => this.start();
+        document.getElementById('pauseBtn').onclick = () => this.stop();
+        document.getElementById('resetBtn').onclick = () => this.reset();
+        
+        const sliders = ['gridSize', 'diffusionRate', 'nonlinearStrength'];
+        sliders.forEach(id => {
+          const slider = document.getElementById(id);
+          const display = document.getElementById(id + 'Val');
+          
+          slider.oninput = (e) => {
+            this.settings[id] = parseFloat(e.target.value);
+            display.textContent = e.target.value;
+            if (id === 'gridSize') {
+              this.initializeField();
+            }
+          };
+        });
+        
+        document.getElementById('showGrid').onchange = (e) => {
+          this.settings.showGrid = e.target.checked;
+        };
+        
+        document.getElementById('showTrails').onchange = (e) => {
+          this.settings.showTrails = e.target.checked;
+        };
+      }
+      
+      start() {
+        if (!this.isRunning) {
+          this.isRunning = true;
+          this.animate();
+        }
+      }
+      
+      stop() {
+        this.isRunning = false;
+      }
+      
+      reset() {
+        this.stop();
+        this.time = 0;
+        this.initializeField();
+        this.updateMetrics();
+        this.render();
+      }
+      
+      animate() {
+        if (this.isRunning) {
+          this.step();
+          this.render();
+          requestAnimationFrame(() => this.animate());
+        }
+      }
+    }
+    
+    window.addEventListener('load', () => {
+      new LatticePhaseFieldSim();
+    });
+  </script>
+</body>
+</html>
