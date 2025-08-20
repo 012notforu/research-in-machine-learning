@@ -9,7 +9,7 @@ This repository contains interactive machine-learning & physics simulations. To 
 **What is this link?**  
 `research-hub.html` is the repo’s landing page—a single, static dashboard that lists every simulation by category and links to each project file. Open it in your browser after starting a local server; click any card to launch that simulation. Everything runs client-side (no build step, no data collection).
 
-**Open locally:** <http://localhost:8000/research-hub.html>
+**Open locally:** <http://localhost:8000/research-hub.html?v=2>
 
 ---
 
