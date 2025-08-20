@@ -1,0 +1,1164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCFD-Core: Unique Dispersion Dynamics</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f1419, #1e2a3a);
+            color: white;
+            margin: 0;
+            padding: 8px;
+            min-height: 100vh;
+            overflow-x: auto;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            zoom: 0.85;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .theory-panel {
+            background: rgba(255,255,255,0.15);
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 11px;
+            line-height: 1.5;
+        }
+        
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .panel {
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 12px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .panel h3 {
+            margin: 0 0 10px 0;
+            color: #00d4ff;
+            font-size: 14px;
+            border-bottom: 1px solid rgba(0,212,255,0.3);
+            padding-bottom: 5px;
+        }
+        
+        canvas {
+            width: 100%;
+            background: rgba(0,0,0,0.4);
+            border-radius: 4px;
+            border: 1px solid rgba(255,255,255,0.2);
+            height: 120px;
+        }
+        
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin: 10px 0;
+        }
+        
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin: 4px 0;
+            font-size: 10px;
+        }
+        
+        .control-group label {
+            min-width: 40px;
+            font-size: 9px;
+            font-weight: bold;
+            color: #00d4ff;
+        }
+        
+        .control-group input[type="range"] {
+            flex: 1;
+            height: 16px;
+        }
+        
+        .control-group .value {
+            min-width: 35px;
+            text-align: right;
+            font-family: monospace;
+            background: rgba(0,0,0,0.4);
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-size: 9px;
+            color: #00ff88;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #00d4ff, #0099cc);
+            color: white;
+            border: none;
+            padding: 6px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+            font-size: 10px;
+        }
+        
+        button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 3px 6px rgba(0,212,255,0.4);
+        }
+        
+        .metrics {
+            background: rgba(0,0,0,0.5);
+            padding: 6px;
+            border-radius: 4px;
+            margin: 6px 0;
+            font-family: monospace;
+            font-size: 9px;
+            line-height: 1.3;
+        }
+        
+        .metrics-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 2px 0;
+        }
+        
+        .metrics-label {
+            color: #00d4ff;
+        }
+        
+        .metrics-value {
+            color: #00ff88;
+            font-weight: bold;
+        }
+        
+        .dispersion-graph {
+            background: rgba(0,0,0,0.6);
+            padding: 8px;
+            border-radius: 4px;
+            margin: 8px 0;
+            font-size: 10px;
+        }
+        
+        .equation {
+            background: rgba(0,212,255,0.1);
+            padding: 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            text-align: center;
+            margin: 8px 0;
+            border-left: 3px solid #00d4ff;
+        }
+        
+        .highlight {
+            color: #ffeb3b;
+            font-weight: bold;
+        }
+        
+        .status-bar {
+            background: rgba(0,0,0,0.4);
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin: 6px 0;
+            text-align: center;
+            font-weight: bold;
+            color: #00ff88;
+            font-size: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌊 SCFD-Core: Unique Dispersion Dynamics Engine</h1>
+            <p>Exploring the novel λ(k) = -β - κk² - μk⁴ dispersion relation and its implications for symbolic computation</p>
+        </div>
+
+        <div class="theory-panel">
+            <strong>🧮 Theoretical Foundation:</strong> SCFD-Core implements a unique dispersion relation that combines 
+            <span class="highlight">long-wavelength drive (-β)</span> with <span class="highlight">standard diffusion (-κk²)</span> 
+            and <span class="highlight">super-damping (-μk⁴)</span>. This creates finite interface thickness, altered defect dynamics, 
+            and belongs to a different universality class than canonical models (TDGL, Swift-Hohenberg, Cahn-Hilliard). 
+            The k⁴ term provides aggressive high-frequency suppression while maintaining large-scale coherent structures.
+        </div>
+
+        <div class="main-grid">
+            <!-- Dispersion Relation Analysis -->
+            <div class="panel">
+                <h3>📊 Dispersion Analysis</h3>
+                <canvas id="dispersionCanvas" width="300" height="120"></canvas>
+                
+                <div class="equation">
+                    λ(k) = -β - κk² - μk⁴
+                </div>
+                
+                <div class="control-group">
+                    <label>β:</label>
+                    <input type="range" id="beta" min="-2" max="2" step="0.01" value="0.5">
+                    <span class="value" id="betaVal">0.5</span>
+                </div>
+                <div class="control-group">
+                    <label>κ:</label>
+                    <input type="range" id="kappa" min="0" max="2" step="0.01" value="0.8">
+                    <span class="value" id="kappaVal">0.8</span>
+                </div>
+                <div class="control-group">
+                    <label>μ:</label>
+                    <input type="range" id="mu" min="0" max="1" step="0.001" value="0.1">
+                    <span class="value" id="muVal">0.1</span>
+                </div>
+                
+                <div class="metrics">
+                    <div class="metrics-row">
+                        <span class="metrics-label">Critical k:</span>
+                        <span class="metrics-value" id="criticalK">0.00</span>
+                    </div>
+                    <div class="metrics-row">
+                        <span class="metrics-label">Max Growth:</span>
+                        <span class="metrics-value" id="maxGrowth">0.00</span>
+                    </div>
+                    <div class="metrics-row">
+                        <span class="metrics-label">Band Width:</span>
+                        <span class="metrics-value" id="bandWidth">0.00</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SCFD Field Evolution -->
+            <div class="panel">
+                <h3>🌊 SCFD Field Evolution</h3>
+                <canvas id="fieldCanvas" width="300" height="120"></canvas>
+                
+                <div class="control-group">
+                    <label>Field:</label>
+                    <input type="range" id="fieldType" min="0" max="2" step="1" value="0">
+                    <span class="value" id="fieldTypeVal">Coherence</span>
+                </div>
+                <div class="control-group">
+                    <label>Time:</label>
+                    <input type="range" id="timeScale" min="0.1" max="5" step="0.1" value="1">
+                    <span class="value" id="timeScaleVal">1.0</span>
+                </div>
+                
+                <div class="controls">
+                    <button id="pauseField">⏸️ Pause</button>
+                    <button id="resetField">🔄 Reset</button>
+                </div>
+                
+                <div class="status-bar">
+                    Mode: <span id="currentMode">Long-Wave Drive</span>
+                </div>
+                
+                <div class="metrics">
+                    <div class="metrics-row">
+                        <span class="metrics-label">Interface Width:</span>
+                        <span class="metrics-value" id="interfaceWidth">0.00</span>
+                    </div>
+                    <div class="metrics-row">
+                        <span class="metrics-label">Coherence:</span>
+                        <span class="metrics-value" id="fieldCoherence">0.00</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Symbolic Pattern Generation -->
+            <div class="panel">
+                <h3>🔢 Symbolic Pattern Engine</h3>
+                <canvas id="symbolCanvas" width="300" height="120"></canvas>
+                
+                <div class="control-group">
+                    <label>Coupling:</label>
+                    <input type="range" id="coupling" min="0" max="2" step="0.01" value="0.3">
+                    <span class="value" id="couplingVal">0.3</span>
+                </div>
+                <div class="control-group">
+                    <label>Mutation:</label>
+                    <input type="range" id="mutation" min="0" max="1" step="0.01" value="0.15">
+                    <span class="value" id="mutationVal">0.15</span>
+                </div>
+                
+                <div class="controls">
+                    <button id="generateSymbol">⚡ Generate</button>
+                    <button id="analyzePattern">📈 Analyze</button>
+                </div>
+                
+                <div class="metrics">
+                    <div class="metrics-row">
+                        <span class="metrics-label">Symbols:</span>
+                        <span class="metrics-value" id="symbolCount">0</span>
+                    </div>
+                    <div class="metrics-row">
+                        <span class="metrics-label">Entropy:</span>
+                        <span class="metrics-value" id="symbolEntropy">0.00</span>
+                    </div>
+                    <div class="metrics-row">
+                        <span class="metrics-label">Defects:</span>
+                        <span class="metrics-value" id="defectCount">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Aging Controls Panel -->
+            <div class="panel">
+                <h3>🧬 Aging Controls</h3>
+                <canvas id="perceptionCanvas" width="300" height="120"></canvas>
+                
+                <div class="control-group">
+                    <label>Mode:</label>
+                    <input type="range" id="agingMode" min="0" max="1" step="1" value="0">
+                    <span class="value" id="agingModeVal">Young</span>
+                </div>
+                <div class="control-group">
+                    <label>p-Smooth:</label>
+                    <input type="range" id="pSmoothness" min="0.1" max="1" step="0.01" value="0.8">
+                    <span class="value" id="pSmoothnessVal">0.8</span>
+                </div>
+                <div class="control-group">
+                    <label>Clog Rate:</label>
+                    <input type="range" id="clogRate" min="0" max="0.1" step="0.001" value="0.01">
+                    <span class="value" id="clogRateVal">0.01</span>
+                </div>
+                
+                <div class="controls">
+                    <button id="resetAging">🔄 Reset Age</button>
+                    <button id="ageBoost">⚡ Age Burst</button>
+                </div>
+                
+                <div class="metrics">
+                    <div class="metrics-row">
+                        <span class="metrics-label">Route Loss:</span>
+                        <span class="metrics-value" id="routeLoss">0.00</span>
+                    </div>
+                    <div class="metrics-row">
+                        <span class="metrics-label">Repair Rate:</span>
+                        <span class="metrics-value" id="repairRate">1.00</span>
+                    </div>
+                    <div class="metrics-row">
+                        <span class="metrics-label">Clogs:</span>
+                        <span class="metrics-value" id="clogCount">0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Comparison Panel -->
+        <div class="panel">
+            <h3>🔬 Universality Class Comparison</h3>
+            <canvas id="comparisonCanvas" width="100%" height="200"></canvas>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; margin: 10px 0;">
+                <button onclick="showModel('scfd')">SCFD-Core</button>
+                <button onclick="showModel('tdgl')">TDGL</button>
+                <button onclick="showModel('swift')">Swift-Hohenberg</button>
+                <button onclick="showModel('cahn')">Cahn-Hilliard</button>
+            </div>
+            
+            <div class="metrics">
+                <div class="metrics-row">
+                    <span class="metrics-label">Current Model:</span>
+                    <span class="metrics-value" id="currentModel">SCFD-Core</span>
+                </div>
+                <div class="metrics-row">
+                    <span class="metrics-label">Universality Class:</span>
+                    <span class="metrics-value" id="universalityClass">Novel k⁴ Damped</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * SCFD-Core Dispersion Dynamics Implementation
+         * Demonstrates the unique λ(k) = -β - κk² - μk⁴ dispersion relation
+         */
+        
+        class SCFDDispersionEngine {
+            constructor() {
+                console.log('🚀 Initializing SCFD-Core Dispersion Engine...');
+                
+                // SCFD-Core parameters
+                this.beta = 0.5;   // Long-wavelength drive
+                this.kappa = 0.8;  // Standard diffusion 
+                this.mu = 0.1;     // k⁴ super-damping
+                
+                this.time = 0;
+                this.isRunning = true;
+                this.fieldType = 0; // 0: Coherence, 1: Curvature, 2: Entropy
+                this.timeScale = 1.0;
+                this.coupling = 0.3;
+                this.mutation = 0.15;
+                
+                // Field data
+                this.gridSize = 128;
+                this.fieldData = new Float32Array(this.gridSize);
+                this.perceptionField = new Float32Array(this.gridSize);  // p(x,t) aging field
+                this.gammaField = new Float32Array(this.gridSize);       // γ(x) clog patches
+                this.symbolPattern = [];
+                this.defects = [];
+                
+                // Aging parameters
+                this.agingMode = 0;        // 0: Young, 1: Aged
+                this.pSmoothness = 0.8;    // Perception field smoothness
+                this.clogRate = 0.01;      // Rate of γ patch formation
+                this.routeLoss = 0;        // Routing loss metric
+                this.repairRate = 1.0;     // Repair efficiency
+                this.clogCount = 0;        // Number of active clogs
+                
+                // Initialize fields
+                this.perceptionField.fill(1.0);  // Start young (p ≈ 1)
+                this.gammaField.fill(1.0);       // Start unclogged (γ ≈ 1)
+                
+                // Initialize canvases and controls
+                this.initializeCanvases();
+                this.setupControls();
+                this.startComputationalLoop();
+                
+                console.log('✅ SCFD-Core engine initialized');
+            }
+            
+            evolveAgingFields() {
+                const N = this.gridSize;
+                
+                // Update perception field p(x,t) - diffuses slowly, forms aged patches
+                if (this.agingMode === 1) {
+                    const diffusion = 0.01 * this.pSmoothness;
+                    for (let i = 0; i < N; i++) {
+                        const i1 = i === 0 ? N - 1 : i - 1;
+                        const i2 = i === N - 1 ? 0 : i + 1;
+                        
+                        const lap = this.perceptionField[i1] - 2 * this.perceptionField[i] + this.perceptionField[i2];
+                        this.perceptionField[i] += diffusion * lap;
+                        
+                        // Gradual aging in nuclear boundary regions
+                        const center = N / 2;
+                        const ringDist = Math.abs(i - center) / (N / 4);
+                        if (ringDist > 0.8 && ringDist < 1.2) {
+                            this.perceptionField[i] *= 0.999; // Slow decay
+                        }
+                        
+                        // Bounds
+                        this.perceptionField[i] = Math.max(0.1, Math.min(1.0, this.perceptionField[i]));
+                    }
+                }
+                
+                // Update γ(x) clog patches - random blocks that impair translation
+                this.clogCount = 0;
+                for (let i = 0; i < N; i++) {
+                    // Existing clogs recover slowly
+                    if (this.gammaField[i] < 1.0) {
+                        this.gammaField[i] += 0.01 * this.repairRate;
+                        this.gammaField[i] = Math.min(1.0, this.gammaField[i]);
+                    }
+                    
+                    // New clogs form stochastically
+                    if (Math.random() < this.clogRate * (this.agingMode === 1 ? 2.0 : 0.1)) {
+                        this.gammaField[i] = 0.1;
+                    }
+                    
+                    if (this.gammaField[i] < 0.9) this.clogCount++;
+                }
+                
+                // Calculate routing loss metric: r = mean(|div(p ∇K)|)
+                let totalLoss = 0;
+                for (let i = 1; i < N - 1; i++) {
+                    const p_grad = (this.perceptionField[i + 1] - this.perceptionField[i - 1]) * 0.5;
+                    const field_grad = (this.fieldData[i + 1] - this.fieldData[i - 1]) * 0.5;
+                    const divergence = p_grad * field_grad;
+                    totalLoss += Math.abs(divergence);
+                }
+                this.routeLoss = totalLoss / (N - 2);
+                
+                // Update repair rate based on aging mode
+                this.repairRate = this.agingMode === 1 ? 
+                    0.6 + 0.4 * Math.exp(-this.time * 0.01) : 1.0;
+            }
+            
+            applyAgingPresets() {
+                if (this.agingMode === 1) { // Aged mode
+                    // Create nuclear boundary aging pattern
+                    const center = this.gridSize / 2;
+                    for (let i = 0; i < this.gridSize; i++) {
+                        const dist = Math.abs(i - center) / (this.gridSize / 4);
+                        if (dist > 0.7 && dist < 1.3) {
+                            this.perceptionField[i] = 0.3 + 0.4 * Math.random();
+                        }
+                    }
+                } else { // Young mode
+                    this.perceptionField.fill(1.0);
+                    this.gammaField.fill(1.0);
+                    this.repairRate = 1.0;
+                }
+            }
+            
+            resetAging() {
+                this.perceptionField.fill(1.0);
+                this.gammaField.fill(1.0);
+                this.routeLoss = 0;
+                this.repairRate = 1.0;
+                this.clogCount = 0;
+            }
+            
+            applyAgeBurst() {
+                // Rapid aging burst - create patches of low perception
+                for (let i = 0; i < this.gridSize; i += 8) {
+                    const patchSize = 3 + Math.floor(Math.random() * 5);
+                    for (let j = 0; j < patchSize && i + j < this.gridSize; j++) {
+                        this.perceptionField[i + j] *= 0.5 + 0.3 * Math.random();
+                        if (Math.random() < 0.3) {
+                            this.gammaField[i + j] = 0.1 + 0.3 * Math.random();
+                        }
+                    }
+                }
+            }
+            
+            initializeCanvases() {
+                this.dispersionCanvas = document.getElementById('dispersionCanvas');
+                this.dispersionCtx = this.dispersionCanvas.getContext('2d');
+                
+                this.fieldCanvas = document.getElementById('fieldCanvas');
+                this.fieldCtx = this.fieldCanvas.getContext('2d');
+                
+                this.symbolCanvas = document.getElementById('symbolCanvas');
+                this.symbolCtx = this.symbolCanvas.getContext('2d');
+                
+                this.comparisonCanvas = document.getElementById('comparisonCanvas');
+                this.comparisonCtx = this.comparisonCanvas.getContext('2d');
+                
+                this.perceptionCanvas = document.getElementById('perceptionCanvas');
+                this.perceptionCtx = this.perceptionCanvas.getContext('2d');
+                
+                // Fix canvas sizing bug - set width/height via JS to match CSS pixels
+                const resizeCanvas = (canvas) => {
+                    canvas.width = canvas.clientWidth;
+                    canvas.height = canvas.clientHeight;
+                };
+                
+                const canvases = [
+                    this.dispersionCanvas, this.fieldCanvas, this.symbolCanvas, 
+                    this.comparisonCanvas, this.perceptionCanvas
+                ];
+                
+                canvases.forEach(resizeCanvas);
+                
+                // Handle window resize
+                window.addEventListener('resize', () => {
+                    canvases.forEach(resizeCanvas);
+                });
+                
+                console.log('📊 Canvas elements initialized with proper sizing');
+            }
+            
+            setupControls() {
+                // Dispersion parameters
+                document.getElementById('beta').addEventListener('input', (e) => {
+                    this.beta = parseFloat(e.target.value);
+                    document.getElementById('betaVal').textContent = e.target.value;
+                    this.updateDispersionAnalysis();
+                });
+                
+                document.getElementById('kappa').addEventListener('input', (e) => {
+                    this.kappa = parseFloat(e.target.value);
+                    document.getElementById('kappaVal').textContent = e.target.value;
+                    this.updateDispersionAnalysis();
+                });
+                
+                document.getElementById('mu').addEventListener('input', (e) => {
+                    this.mu = parseFloat(e.target.value);
+                    document.getElementById('muVal').textContent = e.target.value;
+                    this.updateDispersionAnalysis();
+                });
+                
+                // Field controls
+                document.getElementById('fieldType').addEventListener('input', (e) => {
+                    this.fieldType = parseInt(e.target.value);
+                    const types = ['Coherence', 'Curvature', 'Entropy'];
+                    document.getElementById('fieldTypeVal').textContent = types[this.fieldType];
+                });
+                
+                document.getElementById('timeScale').addEventListener('input', (e) => {
+                    this.timeScale = parseFloat(e.target.value);
+                    document.getElementById('timeScaleVal').textContent = e.target.value;
+                });
+                
+                document.getElementById('coupling').addEventListener('input', (e) => {
+                    this.coupling = parseFloat(e.target.value);
+                    document.getElementById('couplingVal').textContent = e.target.value;
+                });
+                
+                document.getElementById('mutation').addEventListener('input', (e) => {
+                    this.mutation = parseFloat(e.target.value);
+                    document.getElementById('mutationVal').textContent = e.target.value;
+                });
+                
+                // Aging controls
+                document.getElementById('agingMode').addEventListener('input', (e) => {
+                    this.agingMode = parseInt(e.target.value);
+                    const modes = ['Young', 'Aged'];
+                    document.getElementById('agingModeVal').textContent = modes[this.agingMode];
+                    this.applyAgingPresets();
+                });
+                
+                document.getElementById('pSmoothness').addEventListener('input', (e) => {
+                    this.pSmoothness = parseFloat(e.target.value);
+                    document.getElementById('pSmoothnessVal').textContent = e.target.value;
+                });
+                
+                document.getElementById('clogRate').addEventListener('input', (e) => {
+                    this.clogRate = parseFloat(e.target.value);
+                    document.getElementById('clogRateVal').textContent = e.target.value;
+                });
+                
+                // Buttons
+                document.getElementById('pauseField').addEventListener('click', () => {
+                    this.isRunning = !this.isRunning;
+                    document.getElementById('pauseField').innerHTML = this.isRunning ? '⏸️ Pause' : '▶️ Play';
+                });
+                
+                document.getElementById('resetField').addEventListener('click', () => {
+                    this.resetField();
+                });
+                
+                document.getElementById('generateSymbol').addEventListener('click', () => {
+                    this.generateSymbolicPattern();
+                });
+                
+                document.getElementById('analyzePattern').addEventListener('click', () => {
+                    this.analyzePattern();
+                });
+                
+                document.getElementById('resetAging').addEventListener('click', () => {
+                    this.resetAging();
+                });
+                
+                document.getElementById('ageBoost').addEventListener('click', () => {
+                    this.applyAgeBurst();
+                });
+                
+                // Initialize dispersion analysis
+                this.updateDispersionAnalysis();
+                
+                console.log('🎛️ Controls configured');
+            }
+            
+            // Core dispersion relation: λ(k) = -β - κk² - μk⁴
+            dispersionRelation(k) {
+                return -this.beta - this.kappa * k * k - this.mu * k * k * k * k;
+            }
+            
+            updateDispersionAnalysis() {
+                const ctx = this.dispersionCtx;
+                const width = this.dispersionCanvas.width;
+                const height = this.dispersionCanvas.height;
+                
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                ctx.fillRect(0, 0, width, height);
+                
+                // Plot dispersion curve
+                const kMax = 3.0;
+                let maxGrowthRate = -Infinity;
+                let criticalK = 0;
+                let unstableRange = 0;
+                
+                ctx.strokeStyle = '#00d4ff';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                
+                for (let i = 0; i < width; i++) {
+                    const k = (i / width) * kMax;
+                    const lambda = this.dispersionRelation(k);
+                    const y = height/2 - lambda * height/4;
+                    
+                    if (i === 0) ctx.moveTo(i, y);
+                    else ctx.lineTo(i, y);
+                    
+                    if (lambda > maxGrowthRate) {
+                        maxGrowthRate = lambda;
+                        criticalK = k;
+                    }
+                    
+                    if (lambda > 0) unstableRange++;
+                }
+                ctx.stroke();
+                
+                // Draw zero line
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(0, height/2);
+                ctx.lineTo(width, height/2);
+                ctx.stroke();
+                
+                // Highlight unstable region
+                if (maxGrowthRate > 0) {
+                    ctx.fillStyle = 'rgba(0, 255, 136, 0.1)';
+                    for (let i = 0; i < width; i++) {
+                        const k = (i / width) * kMax;
+                        const lambda = this.dispersionRelation(k);
+                        if (lambda > 0) {
+                            const y = height/2 - lambda * height/4;
+                            ctx.fillRect(i, y, 1, height/2 - y);
+                        }
+                    }
+                }
+                
+                // Update metrics
+                document.getElementById('criticalK').textContent = criticalK.toFixed(3);
+                document.getElementById('maxGrowth').textContent = Math.max(0, maxGrowthRate).toFixed(3);
+                document.getElementById('bandWidth').textContent = (unstableRange / width * kMax).toFixed(3);
+            }
+            
+            evolveField() {
+                // SCFD field evolution using finite differences (k² and k⁴ terms)
+                let dt = 0.01 * this.timeScale;
+                
+                // CFL stability guard for k⁴ terms
+                const dtMax = 0.25 / (this.kappa + 16 * this.mu + 1e-6);
+                dt = Math.min(dt, dtMax);
+                
+                // Update aging fields
+                this.evolveAgingFields();
+                
+                const N = this.gridSize;
+                const newField = new Float32Array(N);
+                
+                for (let i = 0; i < N; i++) {
+                    // Efficient neighbor indexing to avoid repeated modulo operations
+                    const i1 = i === 0 ? N - 1 : i - 1;
+                    const i2 = i === N - 1 ? 0 : i + 1;
+                    const i3 = (i - 2 + N) % N;
+                    const i4 = (i + 2) % N;
+                    
+                    const prev = this.fieldData[i1];
+                    const curr = this.fieldData[i];
+                    const next = this.fieldData[i2];
+                    const prev2 = this.fieldData[i3];
+                    const next2 = this.fieldData[i4];
+                    
+                    // Perception-coupled Laplacian: ∇·(p∇u) ≈ p*∇²u + ∇p·∇u
+                    const p = this.perceptionField[i];
+                    const p_prev = this.perceptionField[i1];
+                    const p_next = this.perceptionField[i2];
+                    
+                    const laplacian = p * (prev - 2 * curr + next) + 
+                                    0.5 * (p_next - p_prev) * (next - prev);
+                    
+                    // Standard fourth derivative (bilaplacian)
+                    const bilaplacian = prev2 - 4 * prev + 6 * curr - 4 * next + next2;
+                    
+                    // γ(x) translation stalls - route through clog patches
+                    const gamma = this.gammaField[i];
+                    
+                    // SCFD evolution: ∂u/∂t = -β*u - κ*∇²u - μ*∇⁴u + nonlinear + aging effects
+                    let evolution = -this.beta * curr - this.kappa * laplacian - this.mu * bilaplacian;
+                    
+                    // Field-specific nonlinear terms (scaled by repair rate in aged mode)
+                    const repairFactor = this.agingMode === 1 ? this.repairRate : 1.0;
+                    if (this.fieldType === 0) { // Coherence
+                        evolution += repairFactor * curr * (1 - curr * curr) * 0.5;
+                    } else if (this.fieldType === 1) { // Curvature  
+                        evolution += repairFactor * Math.sin(curr * Math.PI) * 0.3;
+                    } else { // Entropy
+                        evolution += repairFactor * (curr - curr * curr * curr) * 0.4;
+                    }
+                    
+                    // Coupling effects (route through γ patches)
+                    evolution += gamma * this.coupling * (Math.sin(this.time + i * 0.1) * 0.1);
+                    
+                    // Aging effects: increased K diffusion + entropy noise in aged mode
+                    if (this.agingMode === 1) {
+                        // Increased diffusion in aged mode
+                        evolution -= 0.2 * laplacian;
+                        // Entropy noise (chromatin/repair dysfunction)
+                        evolution += (Math.random() - 0.5) * 0.05 * (1 - p);
+                    }
+                    
+                    newField[i] = curr + dt * evolution;
+                    
+                    // Apply bounds
+                    newField[i] = Math.max(-1, Math.min(1, newField[i]));
+                }
+                
+                // Update field data
+                this.fieldData.set(newField);
+            }
+            
+            renderField() {
+                const ctx = this.fieldCtx;
+                const width = this.fieldCanvas.width;
+                const height = this.fieldCanvas.height;
+                
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+                ctx.fillRect(0, 0, width, height);
+                
+                const dx = width / this.gridSize;
+                
+                // Field visualization
+                ctx.strokeStyle = this.fieldType === 0 ? '#00d4ff' : 
+                                  this.fieldType === 1 ? '#ffeb3b' : '#ff5722';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                
+                for (let i = 0; i < this.gridSize; i++) {
+                    const x = i * dx;
+                    const y = height/2 - this.fieldData[i] * height/3;
+                    
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+                
+                // Detect and mark defects (zero crossings with high gradient) - scale-free version
+                this.defects = [];
+                const gradients = [];
+                
+                // First pass: collect all gradients
+                for (let i = 1; i < this.gridSize - 1; i++) {
+                    const gradient = Math.abs(this.fieldData[i + 1] - this.fieldData[i - 1]) * 0.5;
+                    gradients.push(gradient);
+                }
+                
+                // Calculate 90th percentile threshold
+                gradients.sort((a, b) => a - b);
+                const threshold90 = gradients[Math.floor(gradients.length * 0.9)];
+                
+                // Second pass: detect defects using percentile-based threshold
+                for (let i = 1; i < this.gridSize - 1; i++) {
+                    const prev = this.fieldData[i - 1];
+                    const next = this.fieldData[i + 1];
+                    const gradient = Math.abs(next - prev) * 0.5;
+                    
+                    if (prev * next < 0 && gradient > threshold90) {
+                        this.defects.push(i);
+                        
+                        const x = i * dx;
+                        ctx.fillStyle = '#ff0080';
+                        ctx.fillRect(x - 2, 0, 4, height);
+                    }
+                }
+                
+                // Calculate field metrics
+                let coherence = 0;
+                let interfaceWidth = 0;
+                let transitions = 0;
+                
+                for (let i = 1; i < this.gridSize; i++) {
+                    const gradient = Math.abs(this.fieldData[i] - this.fieldData[i-1]);
+                    coherence += this.fieldData[i] * this.fieldData[i];
+                    interfaceWidth += gradient;
+                    if (gradient > 0.1) transitions++;
+                }
+                
+                coherence = Math.sqrt(coherence / this.gridSize);
+                interfaceWidth = interfaceWidth / transitions || 0;
+                
+                document.getElementById('interfaceWidth').textContent = interfaceWidth.toFixed(3);
+                document.getElementById('fieldCoherence').textContent = coherence.toFixed(3);
+            }
+            
+            renderPerceptionField() {
+                const ctx = this.perceptionCtx;
+                const width = this.perceptionCanvas.width;
+                const height = this.perceptionCanvas.height;
+                
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                ctx.fillRect(0, 0, width, height);
+                
+                const dx = width / this.gridSize;
+                
+                // Render perception field p(x,t) as intensity map
+                for (let i = 0; i < this.gridSize; i++) {
+                    const x = i * dx;
+                    const p = this.perceptionField[i];
+                    const gamma = this.gammaField[i];
+                    
+                    // Young regions: blue-green, Aged regions: yellow-red
+                    const hue = p > 0.7 ? 180 + p * 60 : 60 - p * 60;
+                    const saturation = 70;
+                    const lightness = 30 + p * 50;
+                    
+                    ctx.fillStyle = hsl(${hue}, ${saturation}%, ${lightness}%);
+                    ctx.fillRect(x, 0, dx, height * 0.6);
+                    
+                    // Show γ clogs as red bars at bottom
+                    if (gamma < 0.9) {
+                        ctx.fillStyle = '#ff4444';
+                        ctx.fillRect(x, height * 0.7, dx, height * 0.3);
+                    }
+                }
+                
+                // Overlay grid lines
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+                ctx.lineWidth = 0.5;
+                for (let i = 0; i < this.gridSize; i += 8) {
+                    const x = i * dx;
+                    ctx.beginPath();
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, height);
+                    ctx.stroke();
+                }
+            }
+            
+            generateSymbolicPattern() {
+                // Extract symbolic pattern from field data using tertile-based mapping
+                this.symbolPattern = [];
+                const symbols = ['α', 'β', 'γ', 'δ', 'ε', 'ζ', 'η', 'θ'];
+                
+                // Collect field values for tertile calculation
+                const sampleValues = [];
+                for (let i = 0; i < this.gridSize; i += 4) {
+                    sampleValues.push(Math.abs(this.fieldData[i]));
+                }
+                
+                // Calculate tertiles for parameter-agnostic mapping
+                sampleValues.sort((a, b) => a - b);
+                const n = sampleValues.length;
+                const tertile1 = sampleValues[Math.floor(n * 0.33)];
+                const tertile2 = sampleValues[Math.floor(n * 0.67)];
+                
+                for (let i = 0; i < this.gridSize; i += 4) {
+                    const value = Math.abs(this.fieldData[i]);
+                    
+                    if (value > tertile1) {
+                        let symbolIndex;
+                        if (value > tertile2) {
+                            // Top tertile: complex symbols
+                            symbolIndex = Math.floor((value - tertile2) / (1 - tertile2) * 4) + 4;
+                        } else {
+                            // Middle tertile: basic symbols  
+                            symbolIndex = Math.floor((value - tertile1) / (tertile2 - tertile1) * 4);
+                        }
+                        
+                        symbolIndex = Math.min(symbolIndex, symbols.length - 1);
+                        
+                        this.symbolPattern.push({
+                            symbol: symbols[symbolIndex],
+                            position: i,
+                            strength: value,
+                            perception: this.perceptionField[i]  // Include aging info
+                        });
+                    }
+                }
+                
+                this.renderSymbolPattern();
+                this.updateSymbolMetrics();
+            }
+            
+            renderSymbolPattern() {
+                const ctx = this.symbolCtx;
+                const width = this.symbolCanvas.width;
+                const height = this.symbolCanvas.height;
+                
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                ctx.fillRect(0, 0, width, height);
+                
+                ctx.font = '12px monospace';
+                ctx.textAlign = 'center';
+                
+                for (const pattern of this.symbolPattern) {
+                    const x = (pattern.position / this.gridSize) * width;
+                    const y = height/2 + (Math.random() - 0.5) * height/3;
+                    
+                    // Color symbols based on both field strength and perception
+                    const intensity = pattern.strength;
+                    const perception = pattern.perception || 1.0;
+                    
+                    // Aged symbols appear dimmer and more yellow/red
+                    const hue = perception > 0.7 ? 180 + intensity * 180 : 60 - perception * 60;
+                    const saturation = 70;
+                    const lightness = (50 + intensity * 30) * perception;
+                    
+                    ctx.fillStyle = hsl(${hue}, ${saturation}%, ${lightness}%);
+                    ctx.fillText(pattern.symbol, x, y);
+                    
+                    // Add aging indicators for low perception symbols
+                    if (perception < 0.5) {
+                        ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
+                        ctx.fillRect(x - 8, y - 8, 16, 16);
+                    }
+                }
+            }
+            
+            analyzePattern() {
+                // Calculate pattern entropy and complexity
+                const symbolCounts = {};
+                for (const pattern of this.symbolPattern) {
+                    symbolCounts[pattern.symbol] = (symbolCounts[pattern.symbol] || 0) + 1;
+                }
+                
+                let entropy = 0;
+                const total = this.symbolPattern.length;
+                
+                if (total > 0) {
+                    for (const count of Object.values(symbolCounts)) {
+                        const p = count / total;
+                        entropy -= p * Math.log2(p);
+                    }
+                }
+                
+                document.getElementById('symbolEntropy').textContent = entropy.toFixed(3);
+            }
+            
+            updateSymbolMetrics() {
+                document.getElementById('symbolCount').textContent = this.symbolPattern.length;
+                document.getElementById('defectCount').textContent = this.defects.length;
+                
+                // Update aging metrics
+                document.getElementById('routeLoss').textContent = this.routeLoss.toFixed(3);
+                document.getElementById('repairRate').textContent = this.repairRate.toFixed(2);
+                document.getElementById('clogCount').textContent = this.clogCount;
+                
+                // Determine current mode based on parameters  
+                let mode = 'Stable';
+                if (this.beta < 0) {
+                    mode = 'Long-Wave Drive';
+                } else if (this.mu > this.kappa) {
+                    mode = 'Super-Damped';
+                } else {
+                    mode = 'Diffusive';
+                }
+                
+                // Add aging mode indicator
+                if (this.agingMode === 1) {
+                    mode += ' (Aged)';
+                }
+                
+                document.getElementById('currentMode').textContent = mode;
+            }
+            
+            renderComparison(model = 'scfd') {
+                const ctx = this.comparisonCtx;
+                const width = this.comparisonCanvas.width;
+                const height = this.comparisonCanvas.height;
+                
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                ctx.fillRect(0, 0, width, height);
+                
+                const kMax = 3.0;
+                
+                // Define dispersion relations for different models
+                const models = {
+                    scfd: (k) => -this.beta - this.kappa * k * k - this.mu * k * k * k * k,
+                    tdgl: (k) => -this.beta - this.kappa * k * k,
+                    swift: (k) => -this.beta - (k * k - 1) * (k * k - 1),
+                    cahn: (k) => -this.kappa * k * k + this.mu * k * k * k * k
+                };
+                
+                const colors = {
+                    scfd: '#00d4ff',
+                    tdgl: '#ff5722', 
+                    swift: '#ffeb3b',
+                    cahn: '#4caf50'
+                };
+                
+                const names = {
+                    scfd: 'SCFD-Core',
+                    tdgl: 'TDGL',
+                    swift: 'Swift-Hohenberg', 
+                    cahn: 'Cahn-Hilliard'
+                };
+                
+                ctx.strokeStyle = colors[model];
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                
+                for (let i = 0; i < width; i++) {
+                    const k = (i / width) * kMax;
+                    const lambda = models[model](k);
+                    const y = height/2 - lambda * height/4;
+                    
+                    if (i === 0) ctx.moveTo(i, y);
+                    else ctx.lineTo(i, y);
+                }
+                ctx.stroke();
+                
+                // Zero line
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(0, height/2);
+                ctx.lineTo(width, height/2);
+                ctx.stroke();
+                
+                // Update labels
+                document.getElementById('currentModel').textContent = names[model];
+                
+                const classes = {
+                    scfd: 'Novel k⁴ Damped',
+                    tdgl: 'Diffusive',
+                    swift: 'Band-Pass',
+                    cahn: 'Mass-Conserving'
+                };
+                
+                document.getElementById('universalityClass').textContent = classes[model];
+            }
+            
+            resetField() {
+                this.fieldData.fill(0);
+                
+                // Initialize with small random perturbation
+                for (let i = 0; i < this.gridSize; i++) {
+                    this.fieldData[i] = (Math.random() - 0.5) * 0.1;
+                }
+                
+                this.time = 0;
+                this.symbolPattern = [];
+                this.defects = [];
+                this.resetAging();
+            }
+            
+            startComputationalLoop() {
+                const computeFrame = () => {
+                    if (this.isRunning) {
+                        this.time += 0.05;
+                        this.evolveField();
+                        this.renderField();
+                        this.renderPerceptionField();
+                        
+                        if (Math.floor(this.time * 10) % 20 === 0) {
+                            this.generateSymbolicPattern();
+                        }
+                    }
+                    
+                    requestAnimationFrame(computeFrame);
+                };
+                
+                computeFrame();
+                
+                // Initialize comparison view
+                this.renderComparison('scfd');
+                
+                console.log('🔄 Computational loop started');
+            }
+        }
+        
+        // Global functions for model comparison
+        function showModel(modelType) {
+            window.scfdEngine.renderComparison(modelType);
+        }
+        
+        // Initialize system when page loads
+        window.addEventListener('load', () => {
+            console.log('🎯 Initializing SCFD-Core Dispersion Engine...');
+            window.scfdEngine = new SCFDDispersionEngine();
+        });
+    </script>
+</body>
+</html>
