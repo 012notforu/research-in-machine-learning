@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<<<<<<< HEAD
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Lattice Phase Field Simulation</title>
@@ -83,6 +84,197 @@
           }))
         );
         
+=======
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lattice Phase Field Simulator</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      background: #0f0f23;
+      color: #e1e8f0;
+      font-family: system-ui, sans-serif;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    h1 {
+      text-align: center;
+      color: #64ffda;
+      margin-bottom: 30px;
+    }
+    .main {
+      display: grid;
+      grid-template-columns: 1fr 300px;
+      gap: 20px;
+    }
+    .canvas-container {
+      background: #1a1a2e;
+      padding: 20px;
+      border-radius: 12px;
+      border: 1px solid #444;
+    }
+    canvas {
+      width: 100%;
+      height: 600px;
+      border: 1px solid #444;
+      background: #000;
+    }
+    .controls {
+      background: #1a1a2e;
+      padding: 20px;
+      border-radius: 12px;
+      border: 1px solid #444;
+      height: fit-content;
+    }
+    .control-group {
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      color: #b0bec5;
+    }
+    input[type="range"] {
+      width: 100%;
+    }
+    button {
+      background: #64ffda;
+      color: #001b1f;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-right: 10px;
+      margin-bottom: 10px;
+    }
+    .metrics {
+      background: #1a1a2e;
+      padding: 20px;
+      margin-top: 20px;
+      border-radius: 12px;
+      border: 1px solid #444;
+    }
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 15px;
+    }
+    .metric-item {
+      text-align: center;
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 6px;
+    }
+    .metric-value {
+      font-size: 1.5rem;
+      font-weight: bold;
+      color: #64ffda;
+    }
+    .metric-label {
+      font-size: 0.8rem;
+      color: #b0bec5;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🌊 Lattice Phase Field Simulator</h1>
+    
+    <div class="main">
+      <div class="canvas-container">
+        <canvas id="canvas" width="800" height="600"></canvas>
+      </div>
+      
+      <div class="controls">
+        <div class="control-group">
+          <button id="playBtn">▶️ Play</button>
+          <button id="pauseBtn">⏸️ Pause</button>
+          <button id="resetBtn">🔄 Reset</button>
+        </div>
+        
+        <div class="control-group">
+          <label for="gridSize">Grid Size: <span id="gridSizeVal">64</span></label>
+          <input type="range" id="gridSize" min="32" max="128" value="64" step="8">
+        </div>
+        
+        <div class="control-group">
+          <label for="diffusionRate">Diffusion Rate: <span id="diffusionRateVal">0.1</span></label>
+          <input type="range" id="diffusionRate" min="0.01" max="0.5" value="0.1" step="0.01">
+        </div>
+        
+        <div class="control-group">
+          <label for="nonlinearStrength">Nonlinear Strength: <span id="nonlinearStrengthVal">0.8</span></label>
+          <input type="range" id="nonlinearStrength" min="0.1" max="2.0" value="0.8" step="0.1">
+        </div>
+        
+        <div class="control-group">
+          <label><input type="checkbox" id="showGrid"> Show Grid</label>
+          <label><input type="checkbox" id="showTrails"> Show Trails</label>
+        </div>
+      </div>
+    </div>
+    
+    <div class="metrics">
+      <div class="metric-grid">
+        <div class="metric-item">
+          <div class="metric-value" id="complexityVal">0.000</div>
+          <div class="metric-label">Complexity</div>
+        </div>
+        <div class="metric-item">
+          <div class="metric-value" id="entropyVal">0.000</div>
+          <div class="metric-label">Entropy</div>
+        </div>
+        <div class="metric-item">
+          <div class="metric-value" id="energyVal">0.000</div>
+          <div class="metric-label">Energy</div>
+        </div>
+        <div class="metric-item">
+          <div class="metric-value" id="timeVal">0.000</div>
+          <div class="metric-label">Time</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    class LatticePhaseFieldSim {
+      constructor() {
+        this.canvas = document.getElementById('canvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.isRunning = false;
+        this.time = 0;
+        
+        this.settings = {
+          gridSize: 64,
+          diffusionRate: 0.1,
+          nonlinearStrength: 0.8,
+          showGrid: false,
+          showTrails: false
+        };
+        
+        this.field = null;
+        this.trailBuffer = null;
+        
+        this.initializeField();
+        this.bindControls();
+        this.render();
+      }
+      
+      initializeField() {
+        const { gridSize } = this.settings;
+        
+        this.field = Array(gridSize).fill().map(() => 
+          Array(gridSize).fill().map(() => ({
+            phase: Math.random() * 2 * Math.PI,
+            amplitude: Math.random() * 0.5 + 0.1
+          }))
+        );
+        
+        // Add coherent structures
+>>>>>>> research-Symbolic-systems
         for (let i = 0; i < 3; i++) {
           const cx = Math.floor(Math.random() * gridSize);
           const cy = Math.floor(Math.random() * gridSize);
@@ -96,13 +288,19 @@
               
               if (x >= 0 && x < gridSize && y >= 0 && y < gridSize && dist <= radius) {
                 const strength = Math.exp(-dist*dist / (radius*radius/4));
+<<<<<<< HEAD
                 newField[x][y].phase = Math.atan2(dy, dx) + Math.random() * 0.5;
                 newField[x][y].amplitude = strength * (0.8 + Math.random() * 0.4);
+=======
+                this.field[x][y].phase = Math.atan2(dy, dx) + Math.random() * 0.5;
+                this.field[x][y].amplitude = strength * (0.8 + Math.random() * 0.4);
+>>>>>>> research-Symbolic-systems
               }
             }
           }
         }
         
+<<<<<<< HEAD
         const newTrailBuffer = Array(gridSize).fill().map(() => Array(gridSize).fill(0));
         
         setField(newField);
@@ -350,10 +548,20 @@
         const { gridSize, diffusionRate, nonlinearStrength } = settings;
         const newField = Array(gridSize).fill().map(() => 
           Array(gridSize).fill().map(() => ({ phase: 0, amplitude: 0, complexity: 0 }))
+=======
+        this.trailBuffer = Array(gridSize).fill().map(() => Array(gridSize).fill(0));
+      }
+      
+      step() {
+        const { gridSize, diffusionRate, nonlinearStrength } = this.settings;
+        const newField = Array(gridSize).fill().map(() => 
+          Array(gridSize).fill().map(() => ({ phase: 0, amplitude: 0 }))
+>>>>>>> research-Symbolic-systems
         );
         
         for (let x = 0; x < gridSize; x++) {
           for (let y = 0; y < gridSize; y++) {
+<<<<<<< HEAD
             const cell = field[x]?.[y];
             if (!cell) continue;
             
@@ -473,10 +681,107 @@
           for (let y = 0; y < gridSize; y++) {
             const cell = field[x]?.[y];
             if (!cell) continue;
+=======
+            const current = this.field[x][y];
+            
+            // Get neighbors
+            const neighbors = [
+              this.field[(x+1) % gridSize]?.[y],
+              this.field[x]?.[(y+1) % gridSize],
+              this.field[(x-1+gridSize) % gridSize]?.[y],
+              this.field[x]?.[(y-1+gridSize) % gridSize]
+            ].filter(Boolean);
+            
+            // Diffusion
+            let avgPhase = 0;
+            let avgAmplitude = 0;
+            neighbors.forEach(n => {
+              avgPhase += n.phase;
+              avgAmplitude += n.amplitude;
+            });
+            avgPhase /= neighbors.length;
+            avgAmplitude /= neighbors.length;
+            
+            // Nonlinear coupling
+            const coupling = Math.sin(current.phase - avgPhase) * current.amplitude * nonlinearStrength;
+            
+            // Update
+            newField[x][y].phase = current.phase + diffusionRate * (avgPhase - current.phase) + coupling * 0.01;
+            newField[x][y].amplitude = current.amplitude + diffusionRate * (avgAmplitude - current.amplitude);
+            newField[x][y].amplitude = Math.max(0.01, Math.min(1.0, newField[x][y].amplitude));
+            
+            // Update trails
+            if (this.settings.showTrails) {
+              this.trailBuffer[x][y] = this.trailBuffer[x][y] * 0.95 + current.amplitude * 0.05;
+            }
+          }
+        }
+        
+        this.field = newField;
+        this.time += 0.01;
+        this.updateMetrics();
+      }
+      
+      updateMetrics() {
+        const { gridSize } = this.settings;
+        let totalEnergy = 0;
+        let totalAmplitude = 0;
+        let amplitudeHist = Array(10).fill(0);
+        
+        for (let x = 0; x < gridSize; x++) {
+          for (let y = 0; y < gridSize; y++) {
+            const cell = this.field[x][y];
+            totalEnergy += cell.amplitude * cell.amplitude;
+            totalAmplitude += cell.amplitude;
+            
+            const bin = Math.floor(cell.amplitude * 10);
+            if (bin < 10) amplitudeHist[bin]++;
+          }
+        }
+        
+        const energy = totalEnergy / (gridSize * gridSize);
+        
+        // Calculate entropy
+        const total = amplitudeHist.reduce((a, b) => a + b, 0);
+        const entropy = amplitudeHist.reduce((sum, count) => {
+          if (count > 0) {
+            const p = count / total;
+            return sum - p * Math.log(p);
+          }
+          return sum;
+        }, 0);
+        
+        const complexity = entropy * energy;
+        
+        document.getElementById('complexityVal').textContent = complexity.toFixed(3);
+        document.getElementById('entropyVal').textContent = entropy.toFixed(3);
+        document.getElementById('energyVal').textContent = energy.toFixed(3);
+        document.getElementById('timeVal').textContent = this.time.toFixed(2);
+      }
+      
+      render() {
+        const { gridSize, showGrid, showTrails } = this.settings;
+        const cellSize = this.canvas.width / gridSize;
+        
+        this.ctx.fillStyle = '#000';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        for (let x = 0; x < gridSize; x++) {
+          for (let y = 0; y < gridSize; y++) {
+            const cell = this.field[x][y];
+            const trail = this.trailBuffer[x][y];
+            
+            const hue = (cell.phase / (2 * Math.PI)) * 360;
+            const saturation = 80;
+            const lightness = Math.min(90, 20 + cell.amplitude * 70);
+            
+            this.ctx.fillStyle = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+>>>>>>> research-Symbolic-systems
             
             const px = x * cellSize;
             const py = y * cellSize;
             
+<<<<<<< HEAD
             // Color based on phase
             const hue = (cell.phase / (2 * Math.PI)) * 360;
             const saturation = 80;
@@ -492,10 +797,18 @@
                 ctx.fillStyle = `rgba(255, 255, 255, ${trailValue * 0.3})`;
                 ctx.fillRect(px, py, cellSize, cellSize);
               }
+=======
+            this.ctx.fillRect(px, py, cellSize, cellSize);
+            
+            if (showTrails && trail > 0.01) {
+              this.ctx.fillStyle = `rgba(255, 255, 255, ${trail * 0.3})`;
+              this.ctx.fillRect(px, py, cellSize, cellSize);
+>>>>>>> research-Symbolic-systems
             }
           }
         }
         
+<<<<<<< HEAD
         // Grid overlay
         if (settings.showGrid) {
           ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
@@ -663,6 +976,87 @@
 
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<QuantumSymbolicComplexity />);
+=======
+        if (showGrid) {
+          this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+          this.ctx.lineWidth = 1;
+          
+          for (let x = 0; x <= gridSize; x++) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(x * cellSize, 0);
+            this.ctx.lineTo(x * cellSize, this.canvas.height);
+            this.ctx.stroke();
+          }
+          
+          for (let y = 0; y <= gridSize; y++) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(0, y * cellSize);
+            this.ctx.lineTo(this.canvas.width, y * cellSize);
+            this.ctx.stroke();
+          }
+        }
+      }
+      
+      bindControls() {
+        document.getElementById('playBtn').onclick = () => this.start();
+        document.getElementById('pauseBtn').onclick = () => this.stop();
+        document.getElementById('resetBtn').onclick = () => this.reset();
+        
+        const sliders = ['gridSize', 'diffusionRate', 'nonlinearStrength'];
+        sliders.forEach(id => {
+          const slider = document.getElementById(id);
+          const display = document.getElementById(id + 'Val');
+          
+          slider.oninput = (e) => {
+            this.settings[id] = parseFloat(e.target.value);
+            display.textContent = e.target.value;
+            if (id === 'gridSize') {
+              this.initializeField();
+            }
+          };
+        });
+        
+        document.getElementById('showGrid').onchange = (e) => {
+          this.settings.showGrid = e.target.checked;
+        };
+        
+        document.getElementById('showTrails').onchange = (e) => {
+          this.settings.showTrails = e.target.checked;
+        };
+      }
+      
+      start() {
+        if (!this.isRunning) {
+          this.isRunning = true;
+          this.animate();
+        }
+      }
+      
+      stop() {
+        this.isRunning = false;
+      }
+      
+      reset() {
+        this.stop();
+        this.time = 0;
+        this.initializeField();
+        this.updateMetrics();
+        this.render();
+      }
+      
+      animate() {
+        if (this.isRunning) {
+          this.step();
+          this.render();
+          requestAnimationFrame(() => this.animate());
+        }
+      }
+    }
+    
+    window.addEventListener('load', () => {
+      new LatticePhaseFieldSim();
+    });
+>>>>>>> research-Symbolic-systems
   </script>
 </body>
 </html>

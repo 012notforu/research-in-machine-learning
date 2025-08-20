@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<<<<<<< HEAD
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Symbolic Navier-Stokes Fluid</title>
@@ -50,15 +51,331 @@
         
         for (let i = 0; i < gridSize; i++) {
           for (let j = 0; j < gridSize; j++) {
+=======
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Symbolic Coherence Navier-Stokes Engine</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      background: #111827;
+      color: #e5e7eb;
+      font-family: system-ui, sans-serif;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    h1 {
+      color: #60a5fa;
+      margin: 0 0 10px;
+      font-size: 2rem;
+    }
+    .subtitle {
+      color: #9ca3af;
+      margin: 0 0 20px;
+    }
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .metric-card {
+      background: #1f2937;
+      padding: 12px;
+      border-radius: 8px;
+    }
+    .metric-label {
+      font-size: 14px;
+      color: #9ca3af;
+    }
+    .metric-value {
+      font-size: 1.25rem;
+      font-family: monospace;
+      color: #60a5fa;
+    }
+    .reynolds {
+      color: #fbbf24 !important;
+    }
+    .main-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 24px;
+    }
+    .canvas-container {
+      background: #1f2937;
+      padding: 16px;
+      border-radius: 8px;
+    }
+    .controls-row {
+      margin-bottom: 16px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    button {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .play-btn {
+      background: #059669;
+      color: white;
+    }
+    .play-btn:hover {
+      background: #047857;
+    }
+    .pause-btn {
+      background: #dc2626;
+      color: white;
+    }
+    .pause-btn:hover {
+      background: #b91c1c;
+    }
+    .reset-btn {
+      background: #2563eb;
+      color: white;
+    }
+    .reset-btn:hover {
+      background: #1d4ed8;
+    }
+    #canvas {
+      width: 100%;
+      border: 1px solid #374151;
+      border-radius: 4px;
+      cursor: crosshair;
+    }
+    .canvas-info {
+      font-size: 14px;
+      color: #9ca3af;
+      margin-top: 8px;
+    }
+    .blue-text { color: #60a5fa; }
+    .white-text { color: #ffffff; }
+    .params-panel {
+      background: #1f2937;
+      padding: 16px;
+      border-radius: 8px;
+    }
+    .panel-title {
+      font-size: 1.125rem;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: #60a5fa;
+    }
+    .param-group {
+      margin-bottom: 16px;
+    }
+    .param-group:last-child {
+      margin-bottom: 0;
+    }
+    label {
+      display: block;
+      font-size: 14px;
+      color: #9ca3af;
+      margin-bottom: 4px;
+    }
+    input[type="range"] {
+      width: 100%;
+      margin-bottom: 4px;
+    }
+    .value-display {
+      font-size: 12px;
+      color: #6b7280;
+    }
+    .status-box {
+      background: #374151;
+      padding: 12px;
+      border-radius: 4px;
+      margin-top: 24px;
+    }
+    .status-title {
+      font-weight: 600;
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+    .status-item {
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+    .equation-box {
+      background: #1e3a8a;
+      padding: 12px;
+      border-radius: 4px;
+      margin-top: 16px;
+    }
+    .equation-title {
+      font-weight: 600;
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+    .equation {
+      font-family: monospace;
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+    .equation-desc {
+      font-size: 12px;
+      color: #9ca3af;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🌊 Symbolic Coherence Navier-Stokes Engine</h1>
+    <p class="subtitle">
+      A symbolic implementation of fluid dynamics where coherence flows obey Navier-Stokes-like equations.
+      The field θ represents symbolic phase, with velocity = ∇θ and vorticity = ∇×v.
+    </p>
+    
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-label">Symbolic Energy</div>
+        <div class="metric-value" id="energyVal">0.000</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Total Vorticity</div>
+        <div class="metric-value" id="vorticityVal">0.000</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Max Gradient</div>
+        <div class="metric-value" id="maxGradientVal">0.000</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Re_s (Symbolic)</div>
+        <div class="metric-value reynolds" id="reynoldsVal">0.0</div>
+      </div>
+    </div>
+    
+    <div class="main-grid">
+      <div class="canvas-container">
+        <div class="controls-row">
+          <button id="playBtn" class="play-btn">▶️ Evolve</button>
+          <button id="resetBtn" class="reset-btn">🔄 Reset</button>
+        </div>
+        
+        <canvas id="canvas" width="512" height="512"></canvas>
+        
+        <p class="canvas-info">
+          Click to inject symbolic vortices. 
+          <span class="blue-text">Blue/Red = vorticity</span>, 
+          <span class="white-text">White arrows = velocity</span>
+        </p>
+      </div>
+      
+      <div class="params-panel">
+        <h3 class="panel-title">SCNS Parameters</h3>
+        
+        <div class="param-group">
+          <label for="gamma">Symbolic Viscosity (γ): <span id="gammaVal">0.150</span></label>
+          <input type="range" id="gamma" min="0.01" max="0.5" step="0.01" value="0.15">
+        </div>
+        
+        <div class="param-group">
+          <label for="alpha">Coherence Tension (α): <span id="alphaVal">0.800</span></label>
+          <input type="range" id="alpha" min="0" max="2" step="0.05" value="0.8">
+        </div>
+        
+        <div class="param-group">
+          <label for="convection">Convection Strength: <span id="convectionVal">0.300</span></label>
+          <input type="range" id="convection" min="0" max="1" step="0.05" value="0.3">
+        </div>
+        
+        <div class="param-group">
+          <label for="beta">Inertia Damping (β): <span id="betaVal">0.900</span></label>
+          <input type="range" id="beta" min="0.1" max="2" step="0.05" value="0.9">
+        </div>
+        
+        <div class="status-box">
+          <div class="status-title">System Status</div>
+          <div class="status-item" id="regimeVal">Regime: Laminar</div>
+          <div class="status-item" id="circulationVal">Circulation: 0.0000</div>
+          <div class="status-item" id="energyFluxVal">Energy Flux: 0.00</div>
+        </div>
+        
+        <div class="equation-box">
+          <div class="equation-title">The SCNS Equation</div>
+          <div class="equation">∂θ/∂t + (∇θ·∇)θ = -V'(θ) + γ∇²θ</div>
+          <div class="equation-desc">
+            Where θ is symbolic phase, V'(θ) is coherence potential, 
+            and the convective term creates symbolic turbulence.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    class SymbolicNavierStokes {
+      constructor() {
+        this.canvas = document.getElementById('canvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.isRunning = false;
+        this.animationId = null;
+        
+        // SCNS Parameters
+        this.params = {
+          gamma: 0.15,      // Symbolic viscosity
+          alpha: 0.8,       // Coherence tension
+          beta: 0.9,        // Inertia damping
+          convection: 0.3,  // Nonlinear convective strength
+          dt: 0.016,        // Time step
+          Re_s: 50          // Symbolic Reynolds number
+        };
+        
+        // Grid and state
+        this.gridSize = 64;
+        this.grid = null;
+        this.metrics = {
+          energy: 0,
+          vorticity: 0,
+          maxGradient: 0,
+          circulation: 0
+        };
+        
+        this.initializeField();
+        this.bindControls();
+        this.render();
+      }
+      
+      initializeField() {
+        this.grid = {
+          theta: Array(this.gridSize).fill().map(() => Array(this.gridSize).fill(0)),
+          velocity: Array(this.gridSize).fill().map(() => Array(this.gridSize).fill(0)),
+          vorticity: Array(this.gridSize).fill().map(() => Array(this.gridSize).fill(0)),
+          pressure: Array(this.gridSize).fill().map(() => Array(this.gridSize).fill(0)),
+          prevTheta: Array(this.gridSize).fill().map(() => Array(this.gridSize).fill(0))
+        };
+        
+        // Initialize with symbolic vortex + random perturbations
+        const centerX = this.gridSize / 2;
+        const centerY = this.gridSize / 2;
+        
+        for (let i = 0; i < this.gridSize; i++) {
+          for (let j = 0; j < this.gridSize; j++) {
+>>>>>>> research-Symbolic-systems
             const dx = i - centerX;
             const dy = j - centerY;
             const r = Math.sqrt(dx*dx + dy*dy);
             const angle = Math.atan2(dy, dx);
             
+<<<<<<< HEAD
+=======
+            // Symbolic vortex + noise
+>>>>>>> research-Symbolic-systems
             const vortexStr = 8.0;
             const vortex = vortexStr * Math.exp(-r*r / 100) * Math.sin(2*angle);
             const noise = 0.3 * (Math.random() - 0.5);
             
+<<<<<<< HEAD
             newGrid.theta[i][j] = vortex + noise;
             newGrid.prevTheta[i][j] = newGrid.theta[i][j];
           }
@@ -71,6 +388,18 @@
         if (!grid) return;
         
         const { theta, velocity, vorticity, pressure, prevTheta } = grid;
+=======
+            this.grid.theta[i][j] = vortex + noise;
+            this.grid.prevTheta[i][j] = this.grid.theta[i][j];
+          }
+        }
+      }
+      
+      evolveField() {
+        if (!this.grid) return;
+        
+        const { theta, velocity, vorticity, pressure, prevTheta } = this.grid;
+>>>>>>> research-Symbolic-systems
         const newTheta = theta.map(row => [...row]);
         const newVelocity = velocity.map(row => [...row]);
         const newVorticity = vorticity.map(row => [...row]);
@@ -81,19 +410,34 @@
         let maxGrad = 0;
         let circulation = 0;
         
+<<<<<<< HEAD
         for (let i = 1; i < gridSize - 1; i++) {
           for (let j = 1; j < gridSize - 1; j++) {
             const dtheta_dx = (theta[i+1][j] - theta[i-1][j]) / 2;
             const dtheta_dy = (theta[i][j+1] - theta[i][j-1]) / 2;
             
+=======
+        for (let i = 1; i < this.gridSize - 1; i++) {
+          for (let j = 1; j < this.gridSize - 1; j++) {
+            // Compute gradients (symbolic velocity field)
+            const dtheta_dx = (theta[i+1][j] - theta[i-1][j]) / 2;
+            const dtheta_dy = (theta[i][j+1] - theta[i][j-1]) / 2;
+            
+            // Symbolic velocity = gradient of phase
+>>>>>>> research-Symbolic-systems
             const u = dtheta_dx;
             const v = dtheta_dy;
             newVelocity[i][j] = Math.sqrt(u*u + v*v);
             
+<<<<<<< HEAD
+=======
+            // Compute second derivatives (symbolic viscosity)
+>>>>>>> research-Symbolic-systems
             const d2theta_dx2 = theta[i+1][j] - 2*theta[i][j] + theta[i-1][j];
             const d2theta_dy2 = theta[i][j+1] - 2*theta[i][j] + theta[i][j-1];
             const laplacian = d2theta_dx2 + d2theta_dy2;
             
+<<<<<<< HEAD
             const convective = params.convection * (u * dtheta_dx + v * dtheta_dy);
             
             const coherenceTension = params.alpha * Math.sin(theta[i][j]);
@@ -286,6 +630,222 @@
 
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<SymbolicNavierStokes />);
+=======
+            // Convective term: (∇θ·∇)θ ≈ u∂θ/∂x + v∂θ/∂y  
+            const convective = this.params.convection * (u * dtheta_dx + v * dtheta_dy);
+            
+            // Symbolic pressure (coherence potential)
+            const coherenceTension = this.params.alpha * Math.sin(theta[i][j]);
+            newPressure[i][j] = -coherenceTension;
+            
+            // Symbolic vorticity (discrete curl)
+            const du_dy = i > 0 && i < this.gridSize-1 ? 
+              ((theta[i+1][j+1] - theta[i-1][j+1]) - (theta[i+1][j-1] - theta[i-1][j-1])) / 4 : 0;
+            const dv_dx = j > 0 && j < this.gridSize-1 ? 
+              ((theta[i+1][j+1] - theta[i+1][j-1]) - (theta[i-1][j+1] - theta[i-1][j-1])) / 4 : 0;
+            
+            newVorticity[i][j] = du_dy - dv_dx;
+            
+            // SYMBOLIC NAVIER-STOKES UPDATE:
+            // ∂θ/∂t = -convective + symbolic_pressure + γ∇²θ
+            const dthetaDt = -convective + coherenceTension + this.params.gamma * laplacian;
+            
+            // Second-order time evolution with inertia
+            const acceleration = dthetaDt / this.params.beta;
+            newTheta[i][j] = theta[i][j] + this.params.dt * (theta[i][j] - prevTheta[i][j]) + 
+                            this.params.dt * this.params.dt * acceleration;
+            
+            // Apply symbolic constraints (prevent unbounded growth)
+            newTheta[i][j] = Math.max(-10, Math.min(10, newTheta[i][j]));
+            
+            // Collect metrics
+            totalEnergy += u*u + v*v;
+            totalVorticity += Math.abs(newVorticity[i][j]);
+            maxGrad = Math.max(maxGrad, Math.sqrt(dtheta_dx*dtheta_dx + dtheta_dy*dtheta_dy));
+            circulation += newVorticity[i][j];
+          }
+        }
+        
+        // Update state
+        this.grid = {
+          theta: newTheta,
+          velocity: newVelocity, 
+          vorticity: newVorticity,
+          pressure: newPressure,
+          prevTheta: theta.map(row => [...row])
+        };
+        
+        // Update metrics
+        this.metrics = {
+          energy: totalEnergy / (this.gridSize * this.gridSize),
+          vorticity: totalVorticity / (this.gridSize * this.gridSize),
+          maxGradient: maxGrad,
+          circulation: circulation / (this.gridSize * this.gridSize)
+        };
+      }
+      
+      render() {
+        if (!this.grid) return;
+        
+        const { theta, velocity, vorticity } = this.grid;
+        
+        // Clear canvas
+        this.ctx.fillStyle = '#000012';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        const cellWidth = this.canvas.width / this.gridSize;
+        const cellHeight = this.canvas.height / this.gridSize;
+        
+        // Render symbolic field with flow visualization
+        for (let i = 0; i < this.gridSize; i++) {
+          for (let j = 0; j < this.gridSize; j++) {
+            const x = i * cellWidth;
+            const y = j * cellHeight;
+            
+            // Phase field as background color
+            const phase = theta[i][j];
+            const intensity = Math.abs(phase) / 10;
+            const hue = ((phase + Math.PI) / (2 * Math.PI)) * 360;
+            
+            this.ctx.fillStyle = `hsla(${hue}, 70%, ${20 + intensity * 30}%, 0.8)`;
+            this.ctx.fillRect(x, y, cellWidth, cellHeight);
+            
+            // Vorticity as overlaid streams
+            if (Math.abs(vorticity[i][j]) > 0.01) {
+              const vortStr = Math.abs(vorticity[i][j]) * 50;
+              this.ctx.fillStyle = vorticity[i][j] > 0 ? '#ff4444' : '#4444ff';
+              this.ctx.globalAlpha = Math.min(vortStr, 0.7);
+              this.ctx.fillRect(x + cellWidth/4, y + cellHeight/4, cellWidth/2, cellHeight/2);
+              this.ctx.globalAlpha = 1;
+            }
+            
+            // Velocity vectors
+            if (velocity[i][j] > 0.1 && (i % 4 === 0 && j % 4 === 0)) {
+              const vel = velocity[i][j];
+              const angle = Math.atan2(
+                j > 0 ? theta[i][j] - theta[i][j-1] : 0,
+                i > 0 ? theta[i][j] - theta[i-1][j] : 0
+              );
+              
+              this.ctx.strokeStyle = '#ffffff';
+              this.ctx.lineWidth = Math.min(vel * 2, 3);
+              this.ctx.globalAlpha = 0.6;
+              
+              this.ctx.beginPath();
+              this.ctx.moveTo(x + cellWidth/2, y + cellHeight/2);
+              this.ctx.lineTo(
+                x + cellWidth/2 + Math.cos(angle) * vel * 10,
+                y + cellHeight/2 + Math.sin(angle) * vel * 10
+              );
+              this.ctx.stroke();
+              this.ctx.globalAlpha = 1;
+            }
+          }
+        }
+      }
+      
+      updateDisplay() {
+        const currentReynolds = this.metrics.maxGradient * 32 / this.params.gamma;
+        
+        document.getElementById('energyVal').textContent = this.metrics.energy.toFixed(3);
+        document.getElementById('vorticityVal').textContent = this.metrics.vorticity.toFixed(3);
+        document.getElementById('maxGradientVal').textContent = this.metrics.maxGradient.toFixed(3);
+        document.getElementById('reynoldsVal').textContent = currentReynolds.toFixed(1);
+        
+        // Update status
+        const regime = currentReynolds < 20 ? 'Laminar' : currentReynolds < 100 ? 'Transitional' : 'Turbulent';
+        document.getElementById('regimeVal').textContent = `Regime: ${regime}`;
+        document.getElementById('circulationVal').textContent = `Circulation: ${this.metrics.circulation.toFixed(4)}`;
+        document.getElementById('energyFluxVal').textContent = `Energy Flux: ${(this.metrics.energy / (this.params.gamma + 0.001)).toFixed(2)}`;
+      }
+      
+      addVortex(x, y) {
+        if (!this.grid) return;
+        
+        const gridX = Math.floor((x / 512) * this.gridSize);
+        const gridY = Math.floor((y / 512) * this.gridSize);
+        
+        for (let i = Math.max(0, gridX - 5); i < Math.min(this.gridSize, gridX + 5); i++) {
+          for (let j = Math.max(0, gridY - 5); j < Math.min(this.gridSize, gridY + 5); j++) {
+            const dx = i - gridX;
+            const dy = j - gridY;
+            const r = Math.sqrt(dx*dx + dy*dy);
+            if (r < 5) {
+              const angle = Math.atan2(dy, dx);
+              this.grid.theta[i][j] += 2.0 * Math.exp(-r*r/4) * Math.cos(2*angle);
+            }
+          }
+        }
+      }
+      
+      bindControls() {
+        // Play/Pause button
+        document.getElementById('playBtn').onclick = () => {
+          this.isRunning = !this.isRunning;
+          const btn = document.getElementById('playBtn');
+          if (this.isRunning) {
+            btn.textContent = '⏸️ Pause';
+            btn.className = 'pause-btn';
+            this.animate();
+          } else {
+            btn.textContent = '▶️ Evolve';
+            btn.className = 'play-btn';
+            if (this.animationId) {
+              cancelAnimationFrame(this.animationId);
+            }
+          }
+        };
+        
+        // Reset button
+        document.getElementById('resetBtn').onclick = () => {
+          this.initializeField();
+        };
+        
+        // Parameter sliders
+        document.getElementById('gamma').oninput = (e) => {
+          this.params.gamma = parseFloat(e.target.value);
+          document.getElementById('gammaVal').textContent = e.target.value;
+        };
+        
+        document.getElementById('alpha').oninput = (e) => {
+          this.params.alpha = parseFloat(e.target.value);
+          document.getElementById('alphaVal').textContent = e.target.value;
+        };
+        
+        document.getElementById('convection').oninput = (e) => {
+          this.params.convection = parseFloat(e.target.value);
+          document.getElementById('convectionVal').textContent = e.target.value;
+        };
+        
+        document.getElementById('beta').oninput = (e) => {
+          this.params.beta = parseFloat(e.target.value);
+          document.getElementById('betaVal').textContent = e.target.value;
+        };
+        
+        // Canvas click handler
+        this.canvas.onclick = (e) => {
+          const rect = this.canvas.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+          this.addVortex(x, y);
+        };
+      }
+      
+      animate() {
+        if (this.isRunning) {
+          this.evolveField();
+          this.render();
+          this.updateDisplay();
+          this.animationId = requestAnimationFrame(() => this.animate());
+        }
+      }
+    }
+    
+    // Initialize when page loads
+    window.addEventListener('load', () => {
+      new SymbolicNavierStokes();
+    });
+>>>>>>> research-Symbolic-systems
   </script>
 </body>
 </html>

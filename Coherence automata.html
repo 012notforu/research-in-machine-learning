@@ -1,0 +1,1067 @@
+<!DOCTYPE html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SCFD → CA Universality Tester (single file)</title>
+<style>
+  :root{--bg:#0b0d10;--fg:#e6eef7;--muted:#93a1b0;--line:#1f2937;--accent:#7dd3fc}
+  *{box-sizing:border-box;font:14px/1.3 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+  body{margin:0;background:var(--bg);color:var(--fg)}
+  header{padding:10px 14px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  h1{font-size:16px;margin:0 10px 0 0;color:#e2e8f0}
+  button,select,label,input[type=number]{background:#111827;color:#e5e7eb;border:1px solid #374151;border-radius:6px;padding:6px 8px}
+  button:hover{border-color:#60a5fa;cursor:pointer}
+  #wrap{display:grid;grid-template-columns:520px 1fr;gap:14px;padding:12px}
+  canvas{border:1px solid var(--line);background:#000}
+  .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .muted{color:var(--muted)}
+  .kpi{color:#a7f3d0}
+  .panel{border:1px solid var(--line);border-radius:8px;padding:8px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .spark{width:100%;height:110px}
+  @media (max-width:980px){#wrap{grid-template-columns:1fr}}
+</style>
+
+<header class="row">
+  <h1>SCFD → CA Universality Tester</h1>
+  <button id="start">Start</button>
+  <button id="pause">Pause</button>
+  <button id="reset">Reset</button>
+  <label class="row"><input type="checkbox" id="overlay"> Symbol overlay</label>
+  <label class="row">r:
+    <select id="radius"><option value="1">1</option><option value="2">2</option></select>
+  </label>
+  <span class="kpi">m₃=<span id="m3">0.000</span></span>
+  <span class="kpi">MI=<span id="mi">0.000</span></span>
+  <span class="kpi">FPS=<span id="fps">0</span></span>
+</header>
+
+<div id="wrap">
+  <div>
+    <canvas id="view" width="512" height="512" title="phase hue or symbol overlay"></canvas>
+    <div class="row" style="margin-top:8px">
+      <button id="learn">Learn CA rule</button>
+      <button id="rollout">Rollout CA</button>
+      <button id="btnCoverage">Coverage / OOD</button>
+      <button id="btnCascade">Error cascade</button>
+      <select id="symbolMode" title="symbolization" style="font-size:11px">
+        <option value="phase" selected>phase (3)</option>
+        <option value="amp">amplitude (3)</option>
+        <option value="phaseamp">phase×amp (6)</option>
+      </select>
+      <button id="btnAugment">Augment (on-policy)</button>
+    </div>
+    <div class="row" style="margin-top:4px">
+      <button id="expRule">Export rule JSON</button>
+      <input id="impRuleFile" type="file" accept="application/json" style="display:none">
+      <button id="impRule">Import rule JSON</button>
+      <button id="expLog">Export SCFD log</button>
+      <span id="status" class="muted"></span>
+    </div>
+    <div class="panel" style="margin-top:8px">
+      <div class="grid2">
+        <div>
+          <div>CA-ness score: <b id="caScore">–</b> <span class="muted">(ExactMatchAvg × (1 − ViolationRate))</span></div>
+          <div>Train conflict (violation) rate: <b id="viol">–</b></div>
+          <div>Test exact match: <b id="testAcc">–</b></div>
+          <div>TemporalMemory Δ=H(sₜ₊₁|Nₜ)−H(sₜ₊₁|Nₜ,Nₜ₋₁): <b id="memDelta">–</b></div>
+          <div>Rollout OOD avg: <b id="oodAvg">–</b></div>
+        </div>
+        <div>
+          <canvas id="plotMatch" class="spark"></canvas>
+          <canvas id="plotMI" class="spark"></canvas>
+          <canvas id="plotF1" class="spark"></canvas>
+          <canvas id="plotOOD" class="spark"></canvas>
+        </div>
+      </div>
+    </div>
+    
+    <div class="panel" style="margin-top:8px;border-color:#ef4444">
+      <h3 style="color:#ef4444;margin:0 0 8px 0">🔥 Hypothesis Invalidator</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+        <div>
+          <div style="font-size:12px;font-weight:bold;margin-bottom:4px">Influence Cone Test</div>
+          <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Locality: flipped cell differences must expand ≤ r·t</div>
+          <button id="runInfluence" style="width:100%;font-size:11px">Test Locality</button>
+          <div style="margin-top:4px;font-size:10px">
+            Speed: <b id="influenceSpeed">–</b><br>
+            Limit: <b id="influenceLimit">–</b><br>
+            <span id="influenceVerdict" style="font-weight:bold">–</span>
+          </div>
+        </div>
+        
+        <div>
+          <div style="font-size:12px;font-weight:bold;margin-bottom:4px">Markov Order Sweep</div>
+          <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Memory: find minimal (r,k) with low prediction error</div>
+          <button id="runMarkov" style="width:100%;font-size:11px">Test Memory</button>
+          <div style="margin-top:4px;font-size:10px">
+            Min order: <b id="markovOrder">–</b><br>
+            Min radius: <b id="markovRadius">–</b><br>
+            <span id="markovVerdict" style="font-weight:bold">–</span>
+          </div>
+        </div>
+        
+        <div>
+          <div style="font-size:12px;font-weight:bold;margin-bottom:4px">Resampling Invariance</div>
+          <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Identifiability: (r,k) should be stable across Δt</div>
+          <button id="runResampling" style="width:100%;font-size:11px">Test Aliasing</button>
+          <div style="margin-top:4px;font-size:10px">
+            Δt stability: <b id="resampleStability">–</b><br>
+            Aliasing: <b id="aliasingDetected">–</b><br>
+            <span id="resampleVerdict" style="font-weight:bold">–</span>
+          </div>
+        </div>
+      </div>
+      
+      <div style="margin-top:12px;padding:8px;background:rgba(0,0,0,0.3);border-radius:4px">
+        <div style="font-size:11px;font-weight:bold;margin-bottom:4px">Regime Classification:</div>
+        <div id="regimeClassification" style="font-size:10px;color:var(--muted)">Run tests to classify system regime...</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="row">
+      <label>α <input id="alpha" type="number" inputmode="decimal" step="0.01" min="-2" max="2" value="0.8" style="width:70px"><button id="alphaToggle" style="width:25px;padding:2px;margin-left:2px;font-size:10px">±</button></label>
+      <label>β <input id="beta" type="number" inputmode="decimal" step="0.01" min="-2" max="2" value="0.6" style="width:70px"><button id="betaToggle" style="width:25px;padding:2px;margin-left:2px;font-size:10px">±</button></label>
+      <label>γ <input id="gamma" type="number" inputmode="decimal" step="0.01" min="-2" max="2" value="-0.4" style="width:70px"><button id="gammaToggle" style="width:25px;padding:2px;margin-left:2px;font-size:10px">±</button></label>
+      <label>κ <input id="kappa" type="number" inputmode="decimal" step="0.01" min="-1" max="1" value="0.4" style="width:70px"><button id="kappaToggle" style="width:25px;padding:2px;margin-left:2px;font-size:10px">±</button></label>
+      <label>η <input id="eta" type="number" inputmode="decimal" step="0.01" min="-0.5" max="0.5" value="0.08" style="width:70px"><button id="etaToggle" style="width:25px;padding:2px;margin-left:2px;font-size:10px">±</button></label>
+      <label>ε <input id="eps" type="number" inputmode="decimal" step="0.01" min="-0.5" max="0.5" value="0.08" style="width:70px"><button id="epsToggle" style="width:25px;padding:2px;margin-left:2px;font-size:10px">±</button></label>
+      <label>ν <input id="nu" type="number" inputmode="decimal" step="0.01" min="-0.2" max="0.2" value="0.05" style="width:70px"><button id="nuToggle" style="width:25px;padding:2px;margin-left:2px;font-size:10px">±</button></label>
+      <label>Δt <input id="dt" type="number" inputmode="decimal" step="0.001" min="0.001" max="0.05" value="0.008" style="width:80px"></label>
+      <label>N <input id="N" type="number" min="32" max="96" step="8" value="64" style="width:80px"></label>
+    </div>
+    <p class="muted">Stabilized SCFD engine: complex field φ with real diffusion viscosity ν + soft amplitude clip. Overlay shows 3-symbol map and boundaries. "Learn CA rule" fits a local deterministic rule (radius r). "Rollout CA" evolves the learned CA and compares to SCFD symbols.</p>
+  </div>
+</div>
+
+<script>
+(() => {
+  // ---------- helpers ----------
+  const el = id => document.getElementById(id);
+  const clamp = (x,a,b)=>Math.max(a,Math.min(b,x));
+  const mod = (a,n)=>((a%n)+n)%n;
+
+  // === PATCH 1: generalized symbolization, MI, and neighborhood encoding ===
+
+  // global symbolization mode (can be switched by UI)
+  let SYMBOL_MODE = 'phase';  // 'phase' | 'amp' | 'phaseamp'
+
+  // fast palette generator (n up to ~12)
+  function paletteN(n){
+    const out=[];
+    for(let k=0;k<n;k++){
+      const h=k/n, r=Math.round(180+75*Math.sin(2*Math.PI*(h+0/3)));
+      const g=Math.round(180+75*Math.sin(2*Math.PI*(h+1/3)));
+      const b=Math.round(180+75*Math.sin(2*Math.PI*(h+2/3)));
+      out.push([r,g,b]);
+    }
+    return out;
+  }
+
+  // main symbol readout
+  function getSymbols(mode=SYMBOL_MODE){
+    const S = new Uint8Array(N*N);
+    if(mode==='phase'){
+      for(let k=0;k<N*N;k++){
+        const a = Math.atan2(Im[k],Re[k]);
+        const theta = (a + Math.PI) / (2*Math.PI);
+        S[k] = Math.floor(theta*3) % 3;
+      }
+      S._nStates = 3;
+    } else if(mode==='amp'){
+      // 3-quantiles of |phi|
+      const mags = new Float32Array(N*N);
+      for(let k=0;k<N*N;k++) mags[k]=Math.hypot(Re[k],Im[k]);
+      const sorted = Array.from(mags).sort((a,b)=>a-b);
+      const t1 = sorted[(sorted.length*1/3)|0], t2 = sorted[(sorted.length*2/3)|0];
+      for(let k=0;k<N*N;k++){
+        const m=mags[k]; S[k] = (m<t1)?0:((m<t2)?1:2);
+      }
+      S._nStates = 3;
+    } else { // 'phaseamp' => 3 x 2 = 6 states
+      // phase bin (0..2)
+      const P3 = new Uint8Array(N*N);
+      for(let k=0;k<N*N;k++){
+        const a = Math.atan2(Im[k],Re[k]);
+        const theta = (a + Math.PI) / (2*Math.PI);
+        P3[k] = Math.floor(theta*3) % 3;
+      }
+      // amplitude flag (0/1): below/above median
+      const mags = new Float32Array(N*N);
+      for(let k=0;k<N*N;k++) mags[k]=Math.hypot(Re[k],Im[k]);
+      const med = Array.from(mags).sort((a,b)=>a-b)[(mags.length/2)|0];
+      for(let k=0;k<N*N;k++) S[k] = P3[k] + 3*(mags[k]>med ? 1 : 0);
+      S._nStates = 6;
+    }
+    return S;
+  }
+
+  // generalized MI for n-state symbols (horizontal neighbor)
+  function MI_local_xN(S, nStates){
+    const counts = Array.from({length:nStates}, ()=>Array(nStates).fill(0));
+    for(let i=0;i<N;i++) for(let j=0;j<N;j++){
+      const a=S[idx(i,j)], b=S[idx(i,j+1)]; counts[a][b]++;
+    }
+    const eps=1e-12;
+    let total=0; for(let a=0;a<nStates;a++) for(let b=0;b<nStates;b++) total+=counts[a][b];
+    const px=Array(nStates).fill(0), py=Array(nStates).fill(0);
+    for(let a=0;a<nStates;a++) for(let b=0;b<nStates;b++){ px[a]+=counts[a][b]; py[b]+=counts[a][b]; }
+    let MI=0;
+    for(let a=0;a<nStates;a++) for(let b=0;b<nStates;b++){
+      const p=(counts[a][b]+eps)/total, pa=(px[a]+eps)/total, pb=(py[b]+eps)/total;
+      MI += p*(Math.log2(p)-Math.log2(pa)-Math.log2(pb));
+    }
+    return MI;
+  }
+
+  // encode with arbitrary base = nStates
+  function encodeNeighborhoodN(S, i, j, r, nStates){
+    let id=0;
+    for(let di=-r; di<=r; di++){
+      for(let dj=-r; dj<=r; dj++){
+        id = id*nStates + S[idx(i+di,j+dj)];
+      }
+    }
+    return id;
+  }
+
+  // ---------- UI refs ----------
+  const cv = el('view'), ctx = cv.getContext('2d', { willReadFrequently:true });
+  const m3El = el('m3'), miEl = el('mi'), fpsEl = el('fps'), statusEl = el('status');
+  const overlayToggle = el('overlay'), radiusSel = el('radius');
+  const plotMatch = el('plotMatch').getContext('2d');
+  const plotMI    = el('plotMI').getContext('2d');
+  const plotF1    = el('plotF1').getContext('2d');
+  const plotOOD = (document.getElementById('plotOOD') || {}).getContext?.('2d') || null;
+  const oodAvgEl = document.getElementById('oodAvg') || { textContent: '' };
+
+  // ---------- params ----------
+  let P = {
+    alpha:+el('alpha').value, beta:+el('beta').value, gamma:+el('gamma').value,
+    kappa:+el('kappa').value, eta:+el('eta').value, eps:+el('eps').value,
+    nu:+el('nu').value, dt:+el('dt').value, N:+el('N').value
+  };
+  ['alpha','beta','gamma','kappa','eta','eps','nu','dt','N'].forEach(id=>{
+    el(id).addEventListener('change',()=>{ P[id]=+el(id).value; reset(); });
+  });
+
+  // Add sign toggle buttons
+  function addToggle(paramId) {
+    const toggleBtn = el(paramId + 'Toggle');
+    const input = el(paramId);
+    if (toggleBtn && input) {
+      toggleBtn.onclick = () => {
+        const currentVal = parseFloat(input.value) || 0;
+        const newVal = -currentVal;
+        input.value = newVal.toFixed(3);
+        P[paramId] = newVal;
+        reset();
+      };
+    }
+  }
+  
+  ['alpha','beta','gamma','kappa','eta','eps','nu'].forEach(addToggle);
+
+  // ---------- field ----------
+  let N, Re, Im, Re2, Im2, running=false, frame=0, last=performance.now();
+  function idx(i,j){ return mod(i,N)*N + mod(j,N); }
+  function initField(){
+    N = P.N;
+    Re = new Float32Array(N*N); Im = new Float32Array(N*N);
+    Re2= new Float32Array(N*N); Im2= new Float32Array(N*N);
+    // small random + three-phase seeds to break symmetry
+    for(let k=0;k<N*N;k++){ Re[k]=(Math.random()-0.5)*0.05; Im[k]=(Math.random()-0.5)*0.05; }
+    for(let i=0;i<N/3;i++) for(let j=0;j<N/3;j++) { Re[idx(i,j)]=1; Im[idx(i,j)]=0; }
+    for(let i=N/3;i<2*N/3;i++) for(let j=N/3;j<2*N/3;j++) {
+      Re[idx(i,j)]=Math.cos(2*Math.PI/3); Im[idx(i,j)]=Math.sin(2*Math.PI/3);
+    }
+    for(let i=2*N/3;i<N;i++) for(let j=2*N/3;j<N;j++) {
+      Re[idx(i,j)]=Math.cos(4*Math.PI/3); Im[idx(i,j)]=Math.sin(4*Math.PI/3);
+    }
+  }
+  function lap(i,j){
+    const k=idx(i,j);
+    const r00=Re[k], u00=Im[k];
+    const r10=Re[idx(i+1,j)], u10=Im[idx(i+1,j)];
+    const r01=Re[idx(i,j+1)], u01=Im[idx(i,j+1)];
+    const rm10=Re[idx(i-1,j)], um10=Im[idx(i-1,j)];
+    const r0m1=Re[idx(i,j-1)], u0m1=Im[idx(i,j-1)];
+    return [ (r10+rm10+r01+r0m1-4*r00), (u10+um10+u01+u0m1-4*u00) ];
+  }
+  function nnAvg(i,j){
+    const r10=Re[idx(i+1,j)], u10=Im[idx(i+1,j)];
+    const r01=Re[idx(i,j+1)], u01=Im[idx(i,j+1)];
+    const rm10=Re[idx(i-1,j)], um10=Im[idx(i-1,j)];
+    const r0m1=Re[idx(i,j-1)], u0m1=Im[idx(i,j-1)];
+    return [0.25*(r10+rm10+r01+r0m1), 0.25*(u10+um10+u01+u0m1)];
+  }
+  function step(){
+    const {alpha,beta,gamma,kappa,eta,eps,nu,dt} = P;
+    for(let i=0;i<N;i++) for(let j=0;j<N;j++){
+      const k=idx(i,j), r=Re[k], u=Im[k];
+      const [lr,lu]=lap(i,j), [ar,au]=nnAvg(i,j);
+      const abs2 = r*r + u*u;
+      // RHS of damped/forced CGLE-ish system
+      const rhs_r = -alpha*lr + beta*r + gamma*abs2*r + kappa*(ar - r) + eps*(r*r - u*u) - eta*r;
+      const rhs_u = -alpha*lu + beta*u + gamma*abs2*u + kappa*(au - u) - eps*(2*r*u) - eta*u;
+      // ∂t φ = -i RHS + nu ∇²φ  (real viscosity stabilizer)
+      const dRe =  rhs_u + nu*lr;
+      const dIm = -rhs_r + nu*lu;
+      let nr = r + dt*dRe, nuu = u + dt*dIm;
+      const a = Math.hypot(nr,nuu);               // soft amplitude cap
+      if (a>2.0){ const s=2.0/a; nr*=s; nuu*=s; }
+      Re2[k]=nr; Im2[k]=nuu;
+    }
+    [Re,Re2]=[Re2,Re]; [Im,Im2]=[Im2,Im];
+  }
+
+  // ---------- symbols & metrics ----------
+  const symLUT = [[220,70,70],[70,220,90],[80,150,240]]; // RGB for 0/1/2
+  function symbolsFromPhase(){
+    const S = new Uint8Array(N*N);
+    for(let k=0;k<N*N;k++){
+      const a = Math.atan2(Im[k],Re[k]);
+      const theta = (a + Math.PI) / (2*Math.PI); // 0..1
+      const s = Math.floor(theta*3) % 3;
+      S[k]=s;
+    }
+    return S;
+  }
+  function m3_from_field(){
+    let c=0,s=0;
+    for(let k=0;k<N*N;k++){
+      const r=Re[k], u=Im[k];
+      const a = Math.hypot(r,u) || 1e-12;
+      const xr=r/a, xi=u/a; // unit complex
+      // z^3
+      const re3 = xr*(xr*xr - 3*xi*xi);
+      const im3 = xi*(3*xr*xr - xi*xi);
+      c+=re3; s+=im3;
+    }
+    return Math.hypot(c,s)/(N*N);
+  }
+  function MI_local_x(S){
+    const counts = Array.from({length:3},()=>[0,0,0]);
+    for(let i=0;i<N;i++) for(let j=0;j<N;j++){
+      const a=S[idx(i,j)], b=S[idx(i,j+1)];
+      counts[a][b]++;
+    }
+    const eps=1e-12;
+    let total=0; for(let a=0;a<3;a++) for(let b=0;b<3;b++) total+=counts[a][b];
+    const px=[0,0,0], py=[0,0,0];
+    for(let a=0;a<3;a++) for(let b=0;b<3;b++){ px[a]+=counts[a][b]; py[b]+=counts[a][b]; }
+    let MI=0;
+    for(let a=0;a<3;a++) for(let b=0;b<3;b++){
+      const p=(counts[a][b]+eps)/total, pa=(px[a]+eps)/total, pb=(py[b]+eps)/total;
+      MI += p*(Math.log2(p)-Math.log2(pa)-Math.log2(pb));
+    }
+    return MI;
+  }
+  function boundaryMask(S){
+    const M = new Uint8Array(N*N);
+    for(let i=0;i<N;i++) for(let j=0;j<N;j++){
+      const s=S[idx(i,j)];
+      if (s!==S[idx(i+1,j)] || s!==S[idx(i-1,j)] || s!==S[idx(i,j+1)] || s!==S[idx(i,j-1)]) M[idx(i,j)]=1;
+    }
+    return M;
+  }
+  function f1_boundary(S, T){
+    const A=boundaryMask(S), B=boundaryMask(T);
+    let tp=0, fp=0, fn=0;
+    for(let k=0;k<N*N;k++){
+      if (A[k] && B[k]) tp++;
+      else if (A[k] && !B[k]) fp++;
+      else if (!A[k] && B[k]) fn++;
+    }
+    const prec = tp/(tp+fp+1e-12), rec=tp/(tp+fn+1e-12);
+    return 2*prec*rec/(prec+rec+1e-12);
+  }
+
+  // ---------- render ----------
+  function draw(S=null){
+    const W=cv.width, H=cv.height;
+    const img = ctx.createImageData(W,H), d=img.data;
+    for(let y=0;y<H;y++){
+      const i=(y/H*N)|0;
+      for(let x=0;x<W;x++){
+        const j=(x/W*N)|0, o=(y*W+x)*4;
+        if (!overlayToggle.checked){
+          const th=Math.atan2(Im[idx(i,j)], Re[idx(i,j)]);
+          const h=(th+Math.PI)/(2*Math.PI);
+          const r=Math.floor(255*Math.abs(Math.sin(Math.PI*h)));
+          const g=Math.floor(255*Math.abs(Math.sin(Math.PI*(h+1/3))));
+          const b=Math.floor(255*Math.abs(Math.sin(Math.PI*(h+2/3))));
+          d[o]=r; d[o+1]=g; d[o+2]=b; d[o+3]=255;
+        } else {
+          const s = S ? S[idx(i,j)] : 0;
+          const nStates = (S && S._nStates) ? S._nStates : 3;
+          const pal = window._pal && window._pal.length===nStates ? window._pal : (window._pal = paletteN(nStates));
+          const [r,g,b] = pal[s % nStates];
+          d[o]=r; d[o+1]=g; d[o+2]=b; d[o+3]=255;
+        }
+      }
+    }
+    // draw boundaries if overlay
+    if (overlayToggle.checked && S){
+      ctx.putImageData(img,0,0);
+      ctx.globalAlpha=0.75; ctx.strokeStyle="#0b0d10"; ctx.lineWidth=1;
+      ctx.beginPath();
+      for(let i=0;i<N;i++) for(let j=0;j<N;j++){
+        const k=idx(i,j), s=S[k];
+        if (s!==S[idx(i+1,j)] || s!==S[idx(i,j+1)]){
+          const x=(j+0.5)/N*W, y=(i+0.5)/N*H;
+          ctx.rect(j/N*W, i/N*H, W/N, H/N);
+        }
+      }
+      ctx.stroke(); ctx.globalAlpha=1;
+      return;
+    }
+    ctx.putImageData(img,0,0);
+  }
+
+  // ---------- loop ----------
+  let S_last = null, MI_series=[], Match_series=[], F1_series=[];
+  function tick(now){
+    if (!running) return;
+    const dtw = now - last; last = now;
+    step();
+    const S = getSymbols();
+    const m3 = m3_from_field();
+    const MI = MI_local_xN(S, S._nStates);
+    m3El.textContent = m3.toFixed(3); miEl.textContent = MI.toFixed(3);
+    fpsEl.textContent = clamp(1000/dtw,0,999).toFixed(0);
+    draw(S);
+    S_last = S;
+    window._nStates = S._nStates;
+    frame++;
+    requestAnimationFrame(tick);
+  }
+
+  function reset(){ running=false; frame=0; initField(); draw(); status('reset'); }
+
+  // ---------- simple sparkline ----------
+  function plot(ctx, data, color="#7dd3fc"){
+    const W=ctx.canvas.width, H=ctx.canvas.height;
+    ctx.clearRect(0,0,W,H);
+    const n=data.length||1; const min=Math.min(...data,0), max=Math.max(...data,1e-6);
+    const lo=min===max?min-1:min, hi=min===max?max+1:max;
+    ctx.strokeStyle=color; ctx.lineWidth=2; ctx.beginPath();
+    for(let i=0;i<n;i++){
+      const x=i/(n-1||1)*(W-6)+3;
+      const y=H-3 - (data[i]-lo)/(hi-lo)*(H-6);
+      if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+  }
+
+  // === PATCH 3: Error-cascade (Lyapunov-ish) ===
+  
+  function errorCascade(rule, r, S0, steps=160){
+    const n = 1 + S0.reduce((m,v)=>v>m?v:m,0);
+    const A = S0.slice(0);
+    const B = S0.slice(0);
+    // flip one cell
+    B[idx((N/2)|0,(N/2)|0)] = (B[idx((N/2)|0,(N/2)|0)] + 1) % n;
+
+    const dist=[];
+    function stepCA(S){
+      const T = new Uint8Array(N*N);
+      for(let i=0;i<N;i++) for(let j=0;j<N;j++){
+        const id = encodeNeighborhoodN(S,i,j,r,n);
+        const pred = rule.table.has(id) ? rule.table.get(id) : S[idx(i,j)];
+        T[idx(i,j)] = pred;
+      }
+      return T;
+    }
+    let Acur=A, Bcur=B;
+    for(let t=0;t<steps;t++){
+      let diff=0; for(let k=0;k<N*N;k++) if (Acur[k]!==Bcur[k]) diff++;
+      dist.push(diff/(N*N));
+      Acur = stepCA(Acur); Bcur = stepCA(Bcur);
+    }
+    // estimate λ from early growth (avoid 0/1 saturations)
+    const ys=[], xs=[];
+    for(let t=1;t<Math.min(steps,60);t++){
+      if (dist[t]>1e-6 && dist[t]<0.25){ xs.push(t); ys.push(Math.log(dist[t])); }
+    }
+    let lam=0;
+    if (xs.length>5){
+      const meanX = xs.reduce((a,b)=>a+b,0)/xs.length;
+      const meanY = ys.reduce((a,b)=>a+b,0)/ys.length;
+      let num=0, den=0; for(let i=0;i<xs.length;i++){ num+=(xs[i]-meanX)*(ys[i]-meanY); den+=(xs[i]-meanX)**2; }
+      lam = (den>0)? num/den : 0;
+    }
+    return { dist, lambda: lam };
+  }
+
+  // === PATCH 4: On-policy augmentation (DAgger-style, simple) ===
+  
+  // rebuild counts from frames
+  function buildCounts(frames, r){
+    const nStates = inferStates(frames);
+    const counts = new Map();
+    for(let t=0; t<frames.length-1; t++){
+      const A=frames[t], B=frames[t+1];
+      for(let i=0;i<N;i++) for(let j=0;j<N;j++){
+        const id = encodeNeighborhoodN(A,i,j,r,nStates);
+        const arr = counts.get(id) || Array(nStates).fill(0);
+        arr[B[idx(i,j)]]++; counts.set(id,arr);
+      }
+    }
+    return {counts, nStates};
+  }
+  function tableFromCounts(counts){
+    const table = new Map();
+    for(const [id,arr] of counts.entries()){
+      let best=0, b=arr[0]; for(let k=1;k<arr.length;k++) if(arr[k]>b){ b=arr[k]; best=k; }
+      table.set(id,best);
+    }
+    return table;
+  }
+
+  // Capture extra frames while rolling the CA; add unseen neighborhoods with SCFD labels
+  async function augmentRuleOnPolicy(r, Kextra=160, stride=2){
+    if (!window._scfdFrames || !window._scfdRule){ status('learn a rule first'); return; }
+    const frames = window._scfdFrames.slice(0); // copy existing dataset
+    const nStates = inferStates(frames);
+
+    // seed counts from current dataset
+    let {counts} = buildCounts(frames, r);
+
+    // start from last observed symbol frame
+    let A = frames[frames.length-1].slice(0);
+    for(let t=0;t<Kextra;t++){
+      // advance SCFD by capturing a fresh labeled frame
+      const fresh = await new Promise(res=>{
+        // advance a tiny bit of wall-clock to let your engine step
+        setTimeout(()=>res(getSymbols()), 16*stride);
+      });
+      frames.push(fresh);
+
+      // CA step from A
+      const B = new Uint8Array(N*N);
+      for(let i=0;i<N;i++) for(let j=0;j<N;j++){
+        const id = encodeNeighborhoodN(A,i,j,r,nStates);
+        if (!window._scfdRule.table.has(id)){
+          // unseen: add labeled example from SCFD fresh frame
+          const lab = fresh[idx(i,j)];
+          const arr = counts.get(id) || Array(nStates).fill(0);
+          arr[lab]++; counts.set(id,arr);
+        }
+        const pred = window._scfdRule.table.has(id) ? window._scfdRule.table.get(id) : A[idx(i,j)];
+        B[idx(i,j)] = pred;
+      }
+      A = B;
+    }
+
+    // Rebuild rule
+    const newTable = tableFromCounts(counts);
+    window._scfdRule = { ...window._scfdRule, table:newTable };
+    window._scfdFrames = frames;
+    status('Augmented rule with on-policy data');
+    
+    // auto recompute plots/CA-ness after augment
+    try { await recomputeAndRenderRollout(); } catch(e){ console.warn(e); }
+  }
+  
+  // Test 1: Influence Cone (Locality)
+  function testInfluenceCone(){
+    return new Promise(async resolve => {
+      status('testing influence cone...');
+      
+      // Capture baseline evolution
+      const baseFrames = await captureFrames(50, 1);
+      
+      // Reset and introduce single-cell perturbation
+      reset(); await new Promise(r => setTimeout(r, 100));
+      const S0 = symbolsFromPhase();
+      const perturbPos = [Math.floor(N/2), Math.floor(N/2)];
+      
+      // Flip one cell by perturbing the underlying field
+      const k = idx(perturbPos[0], perturbPos[1]);
+      Re[k] *= -1; Im[k] *= -1; // phase flip
+      
+      // Capture perturbed evolution
+      const pertFrames = await captureFrames(50, 1);
+      
+      // Track spread of differences
+      const spreads = [];
+      for(let t = 1; t < Math.min(baseFrames.length, pertFrames.length); t++){
+        const A = baseFrames[t], B = pertFrames[t];
+        let maxDist = 0;
+        for(let i = 0; i < N; i++){
+          for(let j = 0; j < N; j++){
+            if(A[idx(i,j)] !== B[idx(i,j)]){
+              const dist = Math.min(
+                Math.abs(i - perturbPos[0]),
+                Math.abs(j - perturbPos[1]),
+                N - Math.abs(i - perturbPos[0]),
+                N - Math.abs(j - perturbPos[1])
+              );
+              maxDist = Math.max(maxDist, dist);
+            }
+          }
+        }
+        spreads.push(maxDist);
+      }
+      
+      // Calculate spread rate
+      const times = spreads.map((_, i) => i + 1);
+      const speed = spreads.length > 2 ? 
+        (spreads[spreads.length-1] - spreads[1]) / (times.length - 2) : 0;
+      
+      resolve({ spreads, speed, times });
+    });
+  }
+  
+  // Test 2: Markov Order/Radius Sweep
+  function testMarkovOrder(){
+    return new Promise(async resolve => {
+      status('testing markov order...');
+      const frames = await captureFrames(80, 1);
+      
+      const results = [];
+      
+      // Test different radius and memory order combinations
+      for(let r = 1; r <= 2; r++){
+        for(let k = 1; k <= 3; k++){
+          const errors = [];
+          
+          // Sliding window prediction with k-step memory
+          for(let t = k; t < frames.length - 1; t++){
+            let correct = 0, total = 0;
+            
+            for(let i = 0; i < N; i++){
+              for(let j = 0; j < N; j++){
+                const history = [];
+                for(let dt = 0; dt < k; dt++){
+                  history.push(encodeNeighborhood(frames[t-dt], i, j, r));
+                }
+                
+                const target = frames[t+1][idx(i,j)];
+                // Simple prediction: majority class from similar histories
+                const pred = frames[t][idx(i,j)]; // identity fallback
+                
+                if(pred === target) correct++;
+                total++;
+              }
+            }
+            
+            errors.push(1 - correct/total);
+          }
+          
+          const avgError = errors.reduce((a,b) => a+b, 0) / errors.length;
+          results.push({ r, k, error: avgError });
+        }
+      }
+      
+      // Find minimal sufficient model
+      results.sort((a,b) => a.error - b.error);
+      const best = results[0];
+      
+      resolve({ results, minRadius: best.r, minOrder: best.k, minError: best.error });
+    });
+  }
+  
+  // Test 3: Resampling Invariance
+  function testResamplingInvariance(){
+    return new Promise(async resolve => {
+      status('testing resampling invariance...');
+      
+      const samplingRates = [1, 2, 3];
+      const rules = [];
+      
+      for(const stride of samplingRates){
+        const frames = await captureFrames(60, stride);
+        if(frames.length < 10) continue;
+        
+        const rule = learnRule(frames, 1); // Use radius 1 for speed
+        rules.push({ stride, rule, violation: rule.violRate, accuracy: rule.testAcc });
+      }
+      
+      // Check if optimal (r,k) is consistent across sampling rates
+      const violations = rules.map(r => r.violation);
+      const accuracies = rules.map(r => r.accuracy);
+      
+      const violationStd = Math.sqrt(violations.reduce((sum, v) => 
+        sum + Math.pow(v - violations.reduce((a,b) => a+b)/violations.length, 2), 0) / violations.length);
+      
+      const accuracyStd = Math.sqrt(accuracies.reduce((sum, v) => 
+        sum + Math.pow(v - accuracies.reduce((a,b) => a+b)/accuracies.length, 2), 0) / accuracies.length);
+      
+      const stability = 1 - Math.max(violationStd, accuracyStd);
+      const aliasing = violationStd > 0.1 || accuracyStd > 0.1;
+      
+      resolve({ rules, stability, aliasing, violationStd, accuracyStd });
+    });
+  }
+  
+  function classifyRegime(influenceResult, markovResult, resampleResult){
+    const regime = [];
+    
+    if(influenceResult && influenceResult.speed > 2.0){
+      regime.push("NON-LOCAL (influence speed > 2.0)");
+    } else if(influenceResult) {
+      regime.push("LOCAL (influence bounded)");
+    }
+    
+    if(markovResult && markovResult.minOrder > 1){
+      regime.push("NON-MARKOVIAN (needs k > 1 memory)");
+    } else if(markovResult && markovResult.minError > 0.3) {
+      regime.push("HIGH-ENTROPY (prediction error > 30%)");
+    } else if(markovResult) {
+      regime.push("MARKOVIAN (k=1 sufficient)");
+    }
+    
+    if(resampleResult && resampleResult.aliasing){
+      regime.push("ALIASED (unstable across Δt)");
+    } else if(resampleResult) {
+      regime.push("IDENTIFIABLE (stable across Δt)");
+    }
+    
+    if(regime.length === 0) return "INSUFFICIENT DATA";
+    
+    // Synthesize overall classification
+    if(regime.some(r => r.includes("NON-LOCAL")) && regime.some(r => r.includes("NON-MARKOVIAN"))){
+      return "COMPLEX DYNAMICS: " + regime.join(", ") + " → Requires sophisticated coarse-graining";
+    } else if(regime.some(r => r.includes("ALIASED"))) {
+      return "OBSERVABILITY ISSUE: " + regime.join(", ") + " → Hidden state or wrong Δt";
+    } else if(regime.some(r => r.includes("HIGH-ENTROPY"))) {
+      return "AMBIGUOUS ABSTRACTION: " + regime.join(", ") + " → Multiple models fit data";
+    } else {
+      return "SIMPLE REGIME: " + regime.join(", ") + " → Standard CA analysis applies";
+    }
+  }
+
+  // ---------- CA learning ----------
+  const Log = { frames: [] }; // for export
+  function status(msg){ statusEl.textContent = msg; }
+  function captureFrames(K=160, stride=2){
+    return new Promise(resolve=>{
+      let captured=0, arr=[];
+      const cap = ()=>{
+        if (captured>=K){ resolve(arr); return; }
+        const S = getSymbols(); arr.push(S.slice(0));
+        Log.frames.push({t:frame, N, params:{...P}});
+        captured++; setTimeout(cap, 16*stride);
+      };
+      cap();
+    });
+  }
+  
+  // helper to infer nStates from frames array
+  function inferStates(frames){
+    let maxv=0;
+    for(const S of frames) for(let k=0;k<S.length;k++) if(S[k]>maxv) maxv=S[k];
+    return maxv+1;
+  }
+  
+  function encodeNeighborhood(S, i, j, r){
+    return encodeNeighborhoodN(S, i, j, r, 3); // legacy compatibility
+  }
+  
+  function learnRule(frames, r){
+    const nStates = inferStates(frames);
+    const split = Math.floor(frames.length*0.7);
+    const train = frames.slice(0,split), test = frames.slice(split-1);
+
+    const counts = new Map(); // id -> [c0..c{nStates-1}]
+    let total=0, conflicts=0;
+
+    for(let t=0; t<train.length-1; t++){
+      const A=train[t], B=train[t+1];
+      for(let i=0;i<N;i++) for(let j=0;j<N;j++){
+        const id = encodeNeighborhoodN(A,i,j,r,nStates);
+        const arr = counts.get(id) || Array(nStates).fill(0);
+        arr[B[idx(i,j)]]++; counts.set(id,arr); total++;
+      }
+    }
+    for (const [,arr] of counts.entries()){
+      const s = arr.reduce((a,b)=>a+b,0), maxv = Math.max(...arr);
+      conflicts += (s - maxv);
+    }
+    const violRate = conflicts / (total||1);
+
+    const table = new Map();
+    for (const [id,arr] of counts.entries()){
+      let best=0, b=arr[0];
+      for(let k=1;k<nStates;k++) if (arr[k]>b){ b=arr[k]; best=k; }
+      table.set(id,best);
+    }
+
+    // test accuracy + coverage on test
+    let correct=0, seen=0, covered=0, totalPairs=0;
+    const seenSet = new Set(counts.keys());
+    for(let t=0; t<test.length-1; t++){
+      const A=test[t], B=test[t+1];
+      for(let i=0;i<N;i++) for(let j=0;j<N;j++){
+        const id = encodeNeighborhoodN(A,i,j,r,nStates);
+        totalPairs++;
+        if (seenSet.has(id)) covered++;
+        if (table.has(id)){ if (table.get(id)===B[idx(i,j)]) correct++; seen++; }
+      }
+    }
+    const testAcc = correct/(seen||1);
+    const coverage = covered/(totalPairs||1);
+
+    // temporal memory as before (using train)
+    const condN = new Map(), condNN = new Map();
+    let totalN=0, totalNN=0;
+    for(let t=1; t<train.length-1; t++){
+      const Pn=train[t-1], A=train[t], B=train[t+1];
+      for(let i=0;i<N;i++) for(let j=0;j<N;j++){
+        const id  = encodeNeighborhoodN(A ,i,j,r,nStates);
+        const idp = encodeNeighborhoodN(Pn,i,j,r,nStates);
+        const next=B[idx(i,j)];
+        const a = condN.get(id )||Array(nStates).fill(0); a[next]++;  condN.set(id ,a); totalN++;
+        const key = idp + nStates**((2*r+1)**2) * id;
+        const b = condNN.get(key)||Array(nStates).fill(0); b[next]++; condNN.set(key,b); totalNN++;
+      }
+    }
+    function Hcond(map,total){
+      let H=0;
+      for (const [,arr] of map.entries()){
+        const s = arr.reduce((u,v)=>u+v,0), p=s/(total||1);
+        let h=0; for(let k=0;k<nStates;k++){ const q=(arr[k]+1e-12)/s; h += -q*Math.log2(q); }
+        H += p*h;
+      }
+      return H;
+    }
+    const memDelta = Math.max(0, Hcond(condN,totalN) - Hcond(condNN,totalNN));
+
+    return { table, violRate, testAcc, memDelta, nStates, coverage, seenSet };
+  }
+
+  function rolloutCA(rule, r, frames, steps=120){
+    const nStates = inferStates(frames);
+    const S0 = frames[0].slice(0);
+    const CA = [S0];
+    const OOD_series = []; // % of neighborhoods not in table
+    for(let t=0;t<steps;t++){
+      const A = CA[CA.length-1];
+      const B = new Uint8Array(N*N);
+      let total=0, unseen=0;
+      for(let i=0;i<N;i++) for(let j=0;j<N;j++){
+        const id = encodeNeighborhoodN(A,i,j,r,nStates); total++;
+        if (!rule.table.has(id)) unseen++;
+        const pred = rule.table.has(id) ? rule.table.get(id) : A[idx(i,j)];
+        B[idx(i,j)] = pred;
+      }
+      OOD_series.push(unseen/(total||1));
+      CA.push(B);
+    }
+    const T = Math.min(CA.length, frames.length);
+    const matchSeries=[], miDriftSeries=[], f1Series=[];
+    for(let t=0;t<T;t++){
+      const A=CA[t], B=frames[t];
+      let same=0; for(let k=0;k<N*N;k++){ if (A[k]===B[k]) same++; }
+      matchSeries.push(same/(N*N));
+      miDriftSeries.push(Math.abs(MI_local_xN(A,nStates) - MI_local_xN(B,nStates)));
+      f1Series.push(f1_boundary(A,B));
+    }
+    const exactAvg = matchSeries.reduce((a,b)=>a+b,0)/(matchSeries.length||1);
+    return { matchSeries, miDriftSeries, f1Series, exactAvg, OOD_series };
+  }
+
+  // ---------- buttons ----------
+  el('start').onclick = ()=>{ if(!running){ running=true; requestAnimationFrame(tick); status('running'); } };
+  el('pause').onclick = ()=>{ running=false; status('paused'); };
+  function reset(){ running=false; frame=0; MI_series=[]; Match_series=[]; F1_series=[]; initField(); draw(); status('reset'); }
+  el('reset').onclick = reset;
+  overlayToggle.onchange = ()=>draw(S_last||getSymbols());
+
+  el('learn').onclick = async ()=>{
+    status('capturing frames…');
+    const frames = await captureFrames(160,2); // ~5s
+    status('learning rule…');
+    const r = +radiusSel.value;
+    const rule = learnRule(frames, r);
+    // stash for later
+    window._scfdFrames = frames;
+    window._scfdRule = rule;
+    el('viol').textContent = rule.violRate.toFixed(3);
+    el('testAcc').textContent = rule.testAcc.toFixed(3);
+    el('memDelta').textContent = rule.memDelta.toFixed(3);
+    status(`rule learned (coverage: ${(rule.coverage*100).toFixed(1)}%)`);
+  };
+
+  el('rollout').onclick = ()=>{
+    if (!window._scfdFrames || !window._scfdRule){ status('learn a rule first'); return; }
+    status('rolling out CA…');
+    const r = +radiusSel.value;
+    const out = rolloutCA(window._scfdRule, r, window._scfdFrames, 160);
+    Match_series = out.matchSeries;
+    MI_series    = out.miDriftSeries;
+    F1_series    = out.f1Series;
+    plot(plotMatch, Match_series, '#a7f3d0');
+    plot(plotMI,    MI_series,    '#93c5fd');
+    plot(plotF1,    F1_series,    '#fca5a5');
+    const caScore = out.exactAvg * (1 - window._scfdRule.violRate);
+    el('caScore').textContent = caScore.toFixed(3);
+    status('done');
+  };
+
+  async function recomputeAndRenderRollout(){
+    if (!window._scfdFrames || !window._scfdRule){ status('learn a rule first'); return; }
+    status('rolling out CA…');
+    const r = +radiusSel.value;
+    const out = rolloutCA(window._scfdRule, r, window._scfdFrames, 160);
+
+    // update series plots
+    Match_series = out.matchSeries;
+    MI_series    = out.miDriftSeries;
+    F1_series    = out.f1Series;
+
+    plot(plotMatch, Match_series, '#a7f3d0');
+    plot(plotMI,    MI_series,    '#93c5fd');
+    plot(plotF1,    F1_series,    '#fca5a5');
+
+    // OOD spark + avg
+    if (plotOOD) plot(plotOOD, out.OOD_series, '#fbbf24');
+    const oodAvg = out.OOD_series.reduce((a,b)=>a+b,0) / (out.OOD_series.length || 1);
+    oodAvgEl.textContent = oodAvg.toFixed(3);
+
+    // CA-ness score
+    const caScore = out.exactAvg * (1 - (window._scfdRule.violRate || 0));
+    const csEl = document.getElementById('caScore'); if (csEl) csEl.textContent = caScore.toFixed(3);
+
+    status('done');
+  }
+
+  el('expRule').onclick = ()=>{
+    if (!window._scfdRule){ status('learn a rule first'); return; }
+    const obj = { radius:+radiusSel.value, N, table:Array.from(window._scfdRule.table.entries()), 
+                  violRate:window._scfdRule.violRate, testAcc:window._scfdRule.testAcc, memDelta:window._scfdRule.memDelta };
+    const blob = new Blob([JSON.stringify(obj,null,2)], {type:'application/json'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='scfd_ca_rule.json'; a.click();
+  };
+
+  el('impRule').onclick = ()=> el('impRuleFile').click();
+  el('impRuleFile').addEventListener('change', async (e)=>{
+    const f=e.target.files[0]; if (!f) return;
+    const txt = await f.text();
+    const obj = JSON.parse(txt);
+    const table = new Map(obj.table);
+    window._scfdRule = { table, violRate:obj.violRate||0, testAcc:obj.testAcc||0, memDelta:obj.memDelta||0 };
+    radiusSel.value = obj.radius||radiusSel.value;
+    status('rule imported');
+  });
+
+  el('expLog').onclick = ()=>{
+    const blob = new Blob([JSON.stringify({meta:{engine:'scfd', N, params:P}, log:Log}, null, 2)], {type:'application/json'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='scfd_log.json'; a.click();
+  };
+
+  // ---------- INVALIDATOR BUTTON HANDLERS ----------
+  
+  el('runInfluence').onclick = async ()=>{
+    const result = await testInfluenceCone();
+    const speed = result.speed.toFixed(2);
+    const limit = (2.0).toFixed(1); // radius=1 CA limit
+    
+    el('influenceSpeed').textContent = speed;
+    el('influenceLimit').textContent = `≤${limit}`;
+    
+    if(result.speed > 2.0){
+      el('influenceVerdict').textContent = 'NON-LOCAL';
+      el('influenceVerdict').style.color = '#ef4444';
+    } else {
+      el('influenceVerdict').textContent = 'LOCAL';
+      el('influenceVerdict').style.color = '#22c55e';
+    }
+    
+    window._influenceResult = result;
+    updateRegimeClassification();
+  };
+  
+  el('runMarkov').onclick = async ()=>{
+    const result = await testMarkovOrder();
+    
+    el('markovOrder').textContent = result.minOrder;
+    el('markovRadius').textContent = result.minRadius;
+    
+    if(result.minOrder > 1){
+      el('markovVerdict').textContent = 'NON-MARKOVIAN';
+      el('markovVerdict').style.color = '#ef4444';
+    } else if(result.minError > 0.3) {
+      el('markovVerdict').textContent = 'HIGH-ENTROPY';
+      el('markovVerdict').style.color = '#f59e0b';
+    } else {
+      el('markovVerdict').textContent = 'MARKOVIAN';
+      el('markovVerdict').style.color = '#22c55e';
+    }
+    
+    window._markovResult = result;
+    updateRegimeClassification();
+  };
+  
+  el('runResampling').onclick = async ()=>{
+    const result = await testResamplingInvariance();
+    
+    el('resampleStability').textContent = result.stability.toFixed(3);
+    el('aliasingDetected').textContent = result.aliasing ? 'YES' : 'NO';
+    
+    if(result.aliasing){
+      el('resampleVerdict').textContent = 'ALIASED';
+      el('resampleVerdict').style.color = '#ef4444';
+    } else {
+      el('resampleVerdict').textContent = 'STABLE';
+      el('resampleVerdict').style.color = '#22c55e';
+    }
+    
+    window._resampleResult = result;
+    updateRegimeClassification();
+  };
+  
+  function updateRegimeClassification(){
+    const classification = classifyRegime(
+      window._influenceResult, 
+      window._markovResult, 
+      window._resampleResult
+    );
+    el('regimeClassification').textContent = classification;
+  }
+
+  // === NEW PATCH BUTTON HANDLERS ===
+  
+  // Coverage / OOD UI hook
+  const btnCoverage = el('btnCoverage');
+  if (btnCoverage) btnCoverage.onclick = ()=>{
+    if (!window._scfdFrames || !window._scfdRule){ status('learn a rule first'); return; }
+    const r = +radiusSel.value;
+    const out = rolloutCA(window._scfdRule, r, window._scfdFrames, 160);
+    console.log('OOD per step (fraction unseen):', out.OOD_series);
+    if (plotOOD) plot(plotOOD, out.OOD_series, '#fbbf24');
+    const oodAvg = out.OOD_series.reduce((a,b)=>a+b,0) / (out.OOD_series.length || 1);
+    oodAvgEl.textContent = oodAvg.toFixed(3);
+    console.log('Training coverage:', window._scfdRule.coverage.toFixed(3));
+    status('Coverage / OOD updated');
+  };
+
+  // Error cascade UI hook
+  const btnCascade = el('btnCascade');
+  if (btnCascade) btnCascade.onclick = ()=>{
+    if (!window._scfdFrames || !window._scfdRule){ status('learn a rule first'); return; }
+    const r = +radiusSel.value;
+    const res = errorCascade(window._scfdRule, r, window._scfdFrames[0], 160);
+    console.log('Error-cascade series (Hamming fraction):', res.dist, 'lambda≈', res.lambda.toFixed(3));
+    status('Error cascade logged (λ='+res.lambda.toFixed(3)+')');
+  };
+
+  // Symbol mode UI hook
+  const sm = el('symbolMode');
+  if (sm){
+    sm.onchange = ()=>{ SYMBOL_MODE = sm.value; window._pal = null; status('symbolization='+SYMBOL_MODE); };
+  }
+
+  // On-policy augmentation UI hook
+  const btnAug = el('btnAugment');
+  if (btnAug) btnAug.onclick = ()=> augmentRuleOnPolicy(+radiusSel.value, 160, 2);
+
+  // ---------- boot ----------
+  initField(); draw(); status('ready');
+})();
+</script>
+</html>

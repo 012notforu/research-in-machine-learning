@@ -1,76 +1,84 @@
-# Research Engineering Portfolio — Experiments, Techniques, and Traces of Logic
+# Research Engineering Portfolio — Interactive Physics Simulations
 
-This repository contains interactive machine-learning & physics simulations. To run them, serve the folder over a local web server (no installs beyond Python or Node required).
+This repository contains a collection of interactive web-based simulations exploring phase field dynamics, gauge theory, and mathematical physics. All simulations run entirely in the browser with no server-side dependencies.
 
 ---
 
 ## Research Hub
 
-**What is this link?**  
-`research-hub.html` is the repo’s landing page—a single, static dashboard that lists every simulation by category and links to each project file. Open it in your browser after starting a local server; click any card to launch that simulation. Everything runs client-side (no build step, no data collection).
+**What is this?**  
+`research-hub.html` is the main dashboard that organizes and links to all simulation files. Open it in your browser after starting a local server to access any simulation. Everything runs client-side with no data collection or external dependencies.
 
 **Open locally:** <http://localhost:8000/research-hub.html>
 
 ---
 
-## Quick Start (pick one)
+## Quick Start
 
-**Option A — Python** (built-in on macOS/Linux, easy on Windows):
-
+**Python (recommended):**
 ```bash
-# from the repo root
+# From the repository root
 python3 -m http.server 8000
-# then open:
-# http://localhost:8000/research-hub.html
-Option B — Node (if you have Node.js):
+# Then open: http://localhost:8000/research-hub.html
+```
 
-bash
-Copy code
-# from the repo root
+**Node.js (alternative):**
+```bash
+# From the repository root
 npx http-server -p 8000
-# then open:
-# http://localhost:8000/research-hub.html
-Purpose
-This repository is a curated portfolio of small, reproducible research artifacts. It showcases how I approach open-ended problems: form a hypothesis, build the smallest testable system, evaluate against a baseline, and iterate with evidence.
+# Then open: http://localhost:8000/research-hub.html
+```
 
-What this demonstrates
-Turning ideas into runnable, deterministic experiments
+---
 
-Writing invariants and lightweight tests to pin down behavior
+## What's Included
 
-Using ablations and before/after comparisons to justify changes
+### Phase Field Dynamics
+- **Coherence-Curvature Sim**: 2D phase field visualization with curvature analysis
+- **Lattice Phase Field Sim**: Discrete lattice-based phase field evolution
+- **Wave to Grid**: Wave function discretization and grid transformation
 
-Preferring readable, inspectable implementations over opaque cleverness
+### Gauge Theory & Topology  
+- **Symbolic Gauge Lab**: Interactive gauge field visualization and manipulation
+- **3D Torus Curvature Testing**: Three-dimensional toroidal surface analysis
+- **Toroidal Phase Pattern Tracker**: Pattern detection and tracking on toroidal surfaces
 
-Documenting the reasoning trail behind key decisions
+### Field Dynamics & Diagnostics
+- **Field Dynamics Lab**: Spin field diagnostics and visualization
+- **Symbolic Fluid Dynamics**: Non-standard fluid simulation approaches
 
-Methods represented
-Discrete dynamical systems and local-update rules
+### Mathematical Models
+- **EM-Inspired 2D Toroidal Model**: Electromagnetic-inspired toy model
+- **Very Early Model**: Initial prototype and concept testing
+- **N-ary Phasor Platform**: Multi-dimensional phasor analysis
+- **Coherence Automata**: Cellular automata with coherence-based rules
 
-Stochastic processes and sampling (seeded RNG, annealing schedules)
+---
 
-Symbolic/algorithmic modeling (finite-state, combinators, cellular automata)
+## Purpose
 
-Optimization and search with simple, explainable heuristics
+This portfolio demonstrates practical approaches to computational physics and mathematical modeling:
 
-Vectorized numerics and pragmatic performance tuning
+- **Interactive experimentation**: Parameter adjustment and visualization
+- **Reproducible results**: Deterministic simulations with seeded randomness
+- **Educational value**: Clear, inspectable code for learning concepts
+- **Research prototyping**: Rapid iteration on mathematical ideas
 
-Evaluation philosophy
-Reproducible by default: fixed seeds and pinned environments
+## Technical Approach
 
-Baselines first: compare to the simplest meaningful alternative
+- **Client-side only**: No server dependencies, runs entirely in browser
+- **Canvas-based rendering**: 2D/3D visualization using HTML5 Canvas and WebGL
+- **Modular design**: Self-contained simulation files
+- **Performance optimized**: Designed for smooth interactive experience
 
-Ablate, then conclude: measure the contribution of each component
+## Scope & Limitations
 
-Test what matters: invariants, sanity checks, and targeted property tests
+These are research prototypes intended for exploration and learning. They:
+- Focus on mathematical and physical concepts
+- Avoid sensitive or dual-use applications  
+- Make claims only to the extent demonstrated by the code
+- Are designed for educational and research purposes
 
-Name limits: state failure modes and non-goals to keep claims tight
+## Contact
 
-Scope & ethics
-These are research prototypes intended for learning and evaluation. They avoid sensitive/dual-use domains and make claims only to the extent demonstrated by included experiments and figures.
-
-Provenance
-This portfolio summarizes a longer development history. A deeper record of experiments, notes, and commit evolution is available on request.
-
-Contact
-Matthew Gautier — see profile for email or open an issue in this repository.
+Matthew Gautier — see profile for contact information or open an issue in this repository.
